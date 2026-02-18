@@ -302,11 +302,15 @@ function renderResults() {
         const countClass = t.buyerCount >= 4 ? 'hot' : t.buyerCount >= 3 ? 'warm' : 'mild';
         const shortMint = t.mint.slice(0, 6) + '...' + t.mint.slice(-4);
         
-        // Group details by wallet, show latest action
+        // Group details by wallet — get EARLIEST buy and latest action
         const walletActions = {};
+        const walletFirstBuy = {};
         for (const d of t.details) {
             if (!walletActions[d.wallet] || d.timestamp > walletActions[d.wallet].timestamp) {
                 walletActions[d.wallet] = d;
+            }
+            if (d.action === 'BUY' && (!walletFirstBuy[d.wallet] || d.timestamp < walletFirstBuy[d.wallet])) {
+                walletFirstBuy[d.wallet] = d.timestamp;
             }
         }
         
@@ -320,12 +324,71 @@ function renderResults() {
         
         const timeStr = t.latestTimestamp ? new Date(t.latestTimestamp * 1000).toLocaleString() : 'Unknown';
         
+        // Build timing data
+        const timingEntries = t.wallets
+            .filter(w => walletFirstBuy[w])
+            .map(w => ({ wallet: w, short: w.slice(0,6)+'...'+w.slice(-4), time: walletFirstBuy[w] }))
+            .sort((a, b) => a.time - b.time);
+        
+        // Find clusters (wallets buying within 15s of each other)
+        const clusterColors = ['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+        const walletCluster = {};
+        let clusterIdx = 0;
+        for (let x = 0; x < timingEntries.length; x++) {
+            if (walletCluster[timingEntries[x].wallet] !== undefined) continue;
+            const group = [timingEntries[x].wallet];
+            for (let y = x + 1; y < timingEntries.length; y++) {
+                if (Math.abs(timingEntries[y].time - timingEntries[x].time) <= 15) {
+                    group.push(timingEntries[y].wallet);
+                }
+            }
+            if (group.length >= 2) {
+                const color = clusterColors[clusterIdx % clusterColors.length];
+                group.forEach(w => { walletCluster[w] = color; });
+                clusterIdx++;
+            }
+        }
+        
+        const hasCluster = Object.keys(walletCluster).length > 0;
+        const cardId = 'timing-' + t.mint.slice(0, 8);
+        
+        let timingHtml = '';
+        if (timingEntries.length >= 2) {
+            const rows = timingEntries.map(e => {
+                const date = new Date(e.time * 1000);
+                const timeStr2 = date.toLocaleTimeString() + '.' + String(date.getMilliseconds()).padStart(3,'0');
+                const dateStr = date.toLocaleDateString();
+                const diff = timingEntries[0].time ? (e.time - timingEntries[0].time) : 0;
+                const diffStr = diff === 0 ? 'FIRST' : '+' + diff + 's';
+                const clusterColor = walletCluster[e.wallet];
+                const borderStyle = clusterColor ? 'border-left:3px solid ' + clusterColor + ';padding-left:8px;' : 'padding-left:11px;';
+                const clusterTag = clusterColor ? ' <span style="color:' + clusterColor + ';font-size:10px;font-weight:600;">MULTI-WALLET?</span>' : '';
+                return '<div style="display:flex;gap:12px;align-items:center;padding:3px 0;' + borderStyle + '">' +
+                    '<span style="color:#666;font-size:11px;min-width:70px;">' + dateStr + '</span>' +
+                    '<span style="color:#e0e0e0;font-size:12px;min-width:90px;">' + timeStr2 + '</span>' +
+                    '<span style="min-width:60px;font-size:11px;' + (diff <= 15 && diff > 0 ? 'color:#ef4444;font-weight:600;' : 'color:#666;') + '">' + diffStr + '</span>' +
+                    '<a href="https://solscan.io/account/' + e.wallet + '" target="_blank" style="color:#7dd3fc;text-decoration:none;font-size:12px;">' + e.short + '</a>' +
+                    clusterTag +
+                '</div>';
+            }).join('');
+            timingHtml = '<div id="' + cardId + '" style="display:none;margin-top:10px;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:6px;padding:10px;">' +
+                '<div style="font-size:11px;color:#666;margin-bottom:6px;">Buy timing (earliest first) — <span style="color:#ef4444;">red = within 15s</span></div>' +
+                rows +
+            '</div>';
+        }
+        
+        const timingBtnColor = hasCluster ? 'background:#ef444422;border-color:#ef444444;color:#ef4444;' : 'background:#1a1a2e;border-color:#2a2a3e;color:#999;';
+        const timingBtn = timingEntries.length >= 2 
+            ? ' <button onclick="toggleTiming(\'' + cardId + '\')" style="' + timingBtnColor + 'padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;">' + (hasCluster ? 'TIMING (!)' : 'Timing') + '</button>'
+            : '';
+        
         return '<div class="overlap-card">' +
             '<div class="token-header">' +
-                '<div><a href="https://solscan.io/token/' + t.mint + '" target="_blank" class="token-name" style="color:#e0e0e0;text-decoration:none;">' + shortMint + '</a> <span style="cursor:pointer;color:#7dd3fc;font-size:11px;" onclick="copyAddr(\'' + t.mint + '\')">[copy CA]</span> <span style="color:#666;font-size:11px;">Last activity: ' + timeStr + '</span></div>' +
+                '<div><a href="https://solscan.io/token/' + t.mint + '" target="_blank" class="token-name" style="color:#e0e0e0;text-decoration:none;">' + shortMint + '</a> <span style="cursor:pointer;color:#7dd3fc;font-size:11px;" onclick="copyAddr(\'' + t.mint + '\')">[copy CA]</span>' + timingBtn + ' <span style="color:#666;font-size:11px;">Last activity: ' + timeStr + '</span></div>' +
                 '<span class="buyer-count ' + countClass + '">' + t.buyerCount + ' wallets</span>' +
             '</div>' +
             '<div class="buyers-list">' + buyerTags + '</div>' +
+            timingHtml +
             '<div class="token-links">' +
                 '<a href="https://birdeye.so/token/' + t.mint + '?chain=solana" target="_blank" class="birdeye">Birdeye</a>' +
                 '<a href="https://dexscreener.com/solana/' + t.mint + '" target="_blank" class="dexscreener">DexScreener</a>' +
@@ -333,6 +396,11 @@ function renderResults() {
             '</div>' +
         '</div>';
     }).join('');
+}
+
+function toggleTiming(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function copyAddr(addr) {
