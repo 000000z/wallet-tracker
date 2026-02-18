@@ -136,7 +136,9 @@ tr:hover { background: #ffffff05; }
 </div>
 
 <div class="actions-bar" id="actionsBar">
-    <button class="btn btn-green" onclick="exportSelected()">Export selected</button>
+    <button class="btn btn-green" onclick="copySelected()">Copy selected</button>
+    <button class="btn btn-green" onclick="copyAll()">Copy all</button>
+    <button class="btn btn-primary" onclick="exportSelected()">Export JSON</button>
     <span class="selected-count" id="selectedCount">0 selected</span>
 </div>
 
@@ -519,6 +521,17 @@ function exportSelected() {
     showToast(selected.length + ' wallets exported');
 }
 
+function copySelected() {
+    const addrs = [];
+    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => addrs.push(cb.dataset.addr));
+    if (!addrs.length) return showToast('Nothing selected');
+    navigator.clipboard.writeText(addrs.join('\n')).then(() => showToast(addrs.length + ' addresses copied'));
+}
+function copyAll() {
+    const addrs = results.map(r => r.address);
+    if (!addrs.length) return showToast('No results');
+    navigator.clipboard.writeText(addrs.join('\n')).then(() => showToast(addrs.length + ' addresses copied'));
+}
 function copyAddr(addr) { navigator.clipboard.writeText(addr).then(() => showToast('Copied: ' + addr)); }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
 </script>
