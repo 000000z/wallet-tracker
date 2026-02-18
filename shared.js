@@ -55,6 +55,7 @@ function injectLayout() {
         { href: 'discover.html', label: 'Discover', icon: 'D' },
         { href: 'token-scanner.html', label: 'Token Scanner', icon: 'T' },
         { href: 'overlap.html', label: 'Overlap', icon: 'O' },
+        { href: 'profile.html', label: 'Profile', icon: 'P' },
     ];
     
     const navItems = pages.map(p => {

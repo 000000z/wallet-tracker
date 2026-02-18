@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Profile - Chillz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+
+.search-bar {
+    padding: 20px 24px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    border-bottom: 1px solid #1e1e2e;
+}
+.search-bar input {
+    flex: 1;
+    background: #12121a;
+    border: 1px solid #2a2a3e;
+    color: #e0e0e0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+}
+.search-bar input:focus { outline: none; border-color: #7dd3fc; }
+.search-bar button {
+    background: #7dd3fc22;
+    border: 1px solid #7dd3fc44;
+    color: #7dd3fc;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+}
+.search-bar button:hover { background: #7dd3fc33; }
+.search-bar select {
+    background: #12121a;
+    border: 1px solid #2a2a3e;
+    color: #e0e0e0;
+    padding: 10px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.progress-wrap {
+    padding: 12px 24px;
+    display: none;
+}
+.progress-bar {
+    height: 4px;
+    background: #1e1e2e;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background: #7dd3fc;
+    border-radius: 2px;
+    transition: width 0.3s;
+    width: 0%;
+}
+.progress-text {
+    font-size: 11px;
+    color: #555;
+    margin-top: 4px;
+}
+
+#profileContent { display: none; }
+
+/* Summary cards */
+.summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    padding: 20px 24px;
+}
+.card {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+.card-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.card-value {
+    font-size: 20px;
+    font-weight: 700;
+}
+.card-sub {
+    font-size: 11px;
+    color: #555;
+    margin-top: 4px;
+}
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+.blue { color: #7dd3fc; }
+.yellow { color: #f59e0b; }
+.gray { color: #666; }
+
+/* Sections */
+.section {
+    padding: 16px 24px;
+}
+.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7dd3fc;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1e1e2e;
+}
+
+/* Trade table */
+.trades-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.trades-table th {
+    text-align: left;
+    padding: 8px;
+    color: #555;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #1e1e2e;
+}
+.trades-table td {
+    padding: 8px;
+    border-bottom: 1px solid #0f0f18;
+    font-size: 12px;
+}
+.trades-table tr:hover { background: #ffffff05; }
+
+.token-link {
+    color: #7dd3fc;
+    text-decoration: none;
+}
+.token-link:hover { text-decoration: underline; }
+
+.links { display: flex; gap: 4px; }
+.links a {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    text-decoration: none;
+}
+.links .solscan { background: #3b82f622; color: #3b82f6; }
+.links .birdeye { background: #22c55e22; color: #22c55e; }
+
+/* Hours chart */
+.hours-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+    padding: 0 4px;
+}
+.hour-bar {
+    flex: 1;
+    background: #7dd3fc44;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+    position: relative;
+}
+.hour-bar:hover { background: #7dd3fc88; }
+.hour-bar .tip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    color: #ccc;
+}
+.hour-bar:hover .tip { display: block; }
+.hours-labels {
+    display: flex;
+    gap: 3px;
+    padding: 4px 4px 0;
+}
+.hours-labels span {
+    flex: 1;
+    text-align: center;
+    font-size: 8px;
+    color: #444;
+}
+
+/* Top tokens */
+.token-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+.token-card {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.token-card .name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+.token-card .meta {
+    font-size: 11px;
+    color: #555;
+}
+.token-card .pnl {
+    font-size: 16px;
+    font-weight: 700;
+    text-align: right;
+}
+.token-card .pnl-sub {
+    font-size: 10px;
+    color: #555;
+    text-align: right;
+}
+
+.badge-win { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-loss { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+
+.wallet-links {
+    padding: 0 24px 8px;
+    display: flex;
+    gap: 8px;
+}
+.wallet-links a {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    text-decoration: none;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: #444;
+}
+.empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+</style>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<div class="search-bar">
+    <input type="text" id="walletInput" placeholder="Paste wallet address..." spellcheck="false">
+    <select id="txCount">
+        <option value="200">200 txs</option>
+        <option value="500" selected>500 txs</option>
+        <option value="1000">1000 txs</option>
+    </select>
+    <button onclick="analyze()">Analyze</button>
+</div>
+
+<div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">Loading...</div>
+</div>
+
+<div id="profileContent">
+    <div class="wallet-links" id="walletLinks"></div>
+    <div class="summary" id="summaryCards"></div>
+
+    <div class="section">
+        <div class="section-title">Active Hours (UTC)</div>
+        <div class="hours-chart" id="hoursChart"></div>
+        <div class="hours-labels" id="hoursLabels"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Top Tokens by PnL</div>
+        <div class="token-grid" id="topTokens"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Recent Trades</div>
+        <table class="trades-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Token</th>
+                    <th>Amount SOL</th>
+                    <th>PnL</th>
+                    <th>Hold Time</th>
+                    <th>Links</th>
+                </tr>
+            </thead>
+            <tbody id="tradesBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="empty-state" id="emptyState">
+    <h2>Wallet Profile</h2>
+    <p>Paste a wallet address to analyze trading history, win rate, PnL, and more.</p>
+</div>
+
+<script src="shared.js"></script>
+<script>
+const API_BASE = 'https://api-mainnet.helius-rpc.com/v0';
+const RPC = 'https://mainnet.helius-rpc.com/?api-key=';
+let apiKey = '';
+
+// Known token names cache
+const tokenNames = {};
+const TOKEN_LIST_API = 'https://api.dexscreener.com/latest/dex/tokens/';
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setProgress(pct, text) {
+    document.getElementById('progressWrap').style.display = 'block';
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = text;
+}
+
+function hideProgress() {
+    document.getElementById('progressWrap').style.display = 'none';
+}
+
+async function fetchTxs(address, limit) {
+    const all = [];
+    let before = undefined;
+    const batchSize = 100;
+    while (all.length < limit) {
+        let url = API_BASE + '/addresses/' + address + '/transactions?api-key=' + apiKey + '&limit=' + batchSize;
+        if (before) url += '&before=' + before;
+        setProgress(Math.min(95, (all.length / limit) * 100), 'Fetching transactions... ' + all.length + '/' + limit);
+        const resp = await fetch(url);
+        if (!resp.ok) {
+            if (resp.status === 429) { await sleep(2000); continue; }
+            break;
+        }
+        const data = await resp.json();
+        if (!data.length) break;
+        all.push(...data);
+        before = data[data.length - 1].signature;
+        if (data.length < batchSize) break;
+        await sleep(150);
+    }
+    return all.slice(0, limit);
+}
+
+function parseSwaps(txs, wallet) {
+    const swaps = [];
+    const walletLower = wallet.toLowerCase();
+
+    for (const tx of txs) {
+        if (tx.transactionError) continue;
+        const ts = tx.timestamp * 1000;
+        const sig = tx.signature;
+
+        // Check tokenTransfers for swaps
+        const transfers = tx.tokenTransfers || [];
+        const nativeTransfers = tx.nativeTransfers || [];
+
+        // Find SOL in/out for this wallet
+        let solIn = 0, solOut = 0;
+        for (const nt of nativeTransfers) {
+            if (nt.toUserAccount === wallet) solIn += nt.amount / 1e9;
+            if (nt.fromUserAccount === wallet) solOut += nt.amount / 1e9;
+        }
+
+        // Find token in/out
+        const tokenIn = [];
+        const tokenOut = [];
+        for (const tt of transfers) {
+            if (tt.toUserAccount === wallet) {
+                tokenIn.push({ mint: tt.mint, amount: tt.tokenAmount, decimals: tt.decimals || 0 });
+            }
+            if (tt.fromUserAccount === wallet) {
+                tokenOut.push({ mint: tt.mint, amount: tt.tokenAmount, decimals: tt.decimals || 0 });
+            }
+        }
+
+        // SOL native mint
+        const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
+        // BUY: SOL goes out, token comes in
+        if (solOut > 0.001 && tokenIn.length > 0) {
+            for (const t of tokenIn) {
+                if (t.mint === SOL_MINT) continue;
+                swaps.push({
+                    type: 'BUY',
+                    token: t.mint,
+                    tokenAmount: t.amount,
+                    solAmount: solOut,
+                    timestamp: ts,
+                    sig: sig,
+                    hour: new Date(ts).getUTCHours()
+                });
+            }
+        }
+
+        // SELL: token goes out, SOL comes in
+        if (solIn > 0.001 && tokenOut.length > 0) {
+            for (const t of tokenOut) {
+                if (t.mint === SOL_MINT) continue;
+                swaps.push({
+                    type: 'SELL',
+                    token: t.mint,
+                    tokenAmount: t.amount,
+                    solAmount: solIn,
+                    timestamp: ts,
+                    sig: sig,
+                    hour: new Date(ts).getUTCHours()
+                });
+            }
+        }
+    }
+
+    return swaps.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function computeProfile(swaps) {
+    // Group by token
+    const tokens = {};
+    for (const s of swaps) {
+        if (!tokens[s.token]) tokens[s.token] = { buys: [], sells: [], totalBuySOL: 0, totalSellSOL: 0 };
+        const t = tokens[s.token];
+        if (s.type === 'BUY') {
+            t.buys.push(s);
+            t.totalBuySOL += s.solAmount;
+        } else {
+            t.sells.push(s);
+            t.totalSellSOL += s.solAmount;
+        }
+    }
+
+    // Compute per-token PnL and hold times
+    const tokenStats = [];
+    let totalWins = 0, totalLosses = 0, totalPnL = 0;
+    const holdTimes = [];
+    const hours = new Array(24).fill(0);
+
+    for (const [mint, data] of Object.entries(tokens)) {
+        const pnl = data.totalSellSOL - data.totalBuySOL;
+        const isWin = pnl > 0;
+        if (data.totalSellSOL > 0) {
+            if (isWin) totalWins++;
+            else totalLosses++;
+        }
+        totalPnL += pnl;
+
+        // Estimate hold time: avg time between first buy and first sell
+        if (data.buys.length > 0 && data.sells.length > 0) {
+            const firstBuy = data.buys[0].timestamp;
+            const firstSell = data.sells[0].timestamp;
+            if (firstSell > firstBuy) {
+                holdTimes.push(firstSell - firstBuy);
+            }
+        }
+
+        tokenStats.push({
+            mint,
+            pnl,
+            buySOL: data.totalBuySOL,
+            sellSOL: data.totalSellSOL,
+            trades: data.buys.length + data.sells.length,
+            buys: data.buys.length,
+            sells: data.sells.length,
+            isWin
+        });
+    }
+
+    // Hours
+    for (const s of swaps) {
+        hours[s.hour]++;
+    }
+
+    // Sort tokens by absolute PnL
+    tokenStats.sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+
+    const completedTrades = totalWins + totalLosses;
+    const winRate = completedTrades > 0 ? (totalWins / completedTrades * 100) : 0;
+    const avgHold = holdTimes.length > 0 ? holdTimes.reduce((a, b) => a + b, 0) / holdTimes.length : 0;
+
+    return {
+        totalSwaps: swaps.length,
+        uniqueTokens: Object.keys(tokens).length,
+        completedTrades,
+        winRate,
+        totalWins,
+        totalLosses,
+        totalPnL,
+        avgHoldMs: avgHold,
+        hours,
+        tokenStats,
+        totalBuySOL: Object.values(tokens).reduce((a, t) => a + t.totalBuySOL, 0),
+        totalSellSOL: Object.values(tokens).reduce((a, t) => a + t.totalSellSOL, 0)
+    };
+}
+
+function formatHoldTime(ms) {
+    if (ms < 60000) return Math.round(ms / 1000) + 's';
+    if (ms < 3600000) return Math.round(ms / 60000) + 'm';
+    if (ms < 86400000) return (ms / 3600000).toFixed(1) + 'h';
+    return (ms / 86400000).toFixed(1) + 'd';
+}
+
+function formatTime(ts) {
+    const d = new Date(ts);
+    const month = d.toLocaleString('en', { month: 'short' });
+    const day = d.getDate();
+    const h = d.getUTCHours().toString().padStart(2, '0');
+    const m = d.getUTCMinutes().toString().padStart(2, '0');
+    return month + ' ' + day + ' ' + h + ':' + m;
+}
+
+async function resolveTokenNames(mints) {
+    const unknown = mints.filter(m => !tokenNames[m]);
+    // Batch in groups of 30
+    for (let i = 0; i < unknown.length; i += 30) {
+        const batch = unknown.slice(i, i + 30);
+        try {
+            const resp = await fetch(TOKEN_LIST_API + batch.join(','));
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.pairs) {
+                    for (const p of data.pairs) {
+                        if (p.baseToken && p.baseToken.address && p.baseToken.symbol) {
+                            tokenNames[p.baseToken.address] = p.baseToken.symbol;
+                        }
+                    }
+                }
+            }
+        } catch(e) {}
+        if (i + 30 < unknown.length) await sleep(300);
+    }
+}
+
+function shortAddr(a) { return a.slice(0, 4) + '...' + a.slice(-4); }
+function tokenName(mint) { return tokenNames[mint] || shortAddr(mint); }
+
+function renderProfile(wallet, profile, swaps) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('profileContent').style.display = 'block';
+
+    // Wallet links
+    document.getElementById('walletLinks').innerHTML =
+        '<a href="https://solscan.io/account/' + wallet + '" target="_blank" class="solscan" style="background:#3b82f622;color:#3b82f6;">Solscan</a>' +
+        '<a href="https://birdeye.so/profile/' + wallet + '?chain=solana" target="_blank" class="birdeye" style="background:#22c55e22;color:#22c55e;">Birdeye</a>';
+
+    // Summary cards
+    const pnlColor = profile.totalPnL >= 0 ? 'green' : 'red';
+    const pnlSign = profile.totalPnL >= 0 ? '+' : '';
+    document.getElementById('summaryCards').innerHTML =
+        '<div class="card"><div class="card-label">Win Rate</div><div class="card-value ' +
+            (profile.winRate >= 50 ? 'green' : 'red') + '">' + profile.winRate.toFixed(1) + '%</div>' +
+            '<div class="card-sub">' + profile.totalWins + 'W / ' + profile.totalLosses + 'L (' + profile.completedTrades + ' closed)</div></div>' +
+        '<div class="card"><div class="card-label">Total PnL</div><div class="card-value ' + pnlColor + '">' +
+            pnlSign + profile.totalPnL.toFixed(2) + ' SOL</div>' +
+            '<div class="card-sub">Bought: ' + profile.totalBuySOL.toFixed(1) + ' | Sold: ' + profile.totalSellSOL.toFixed(1) + '</div></div>' +
+        '<div class="card"><div class="card-label">Avg Hold Time</div><div class="card-value blue">' +
+            formatHoldTime(profile.avgHoldMs) + '</div>' +
+            '<div class="card-sub">Based on ' + profile.completedTrades + ' round trips</div></div>' +
+        '<div class="card"><div class="card-label">Total Swaps</div><div class="card-value yellow">' +
+            profile.totalSwaps + '</div>' +
+            '<div class="card-sub">' + profile.uniqueTokens + ' unique tokens</div></div>' +
+        '<div class="card"><div class="card-label">Volume</div><div class="card-value">' +
+            (profile.totalBuySOL + profile.totalSellSOL).toFixed(1) + ' SOL</div>' +
+            '<div class="card-sub">Total traded</div></div>';
+
+    // Hours chart
+    const maxH = Math.max(...profile.hours, 1);
+    let barsHtml = '';
+    let labelsHtml = '';
+    for (let i = 0; i < 24; i++) {
+        const pct = (profile.hours[i] / maxH) * 100;
+        barsHtml += '<div class="hour-bar" style="height:' + Math.max(2, pct) + '%"><div class="tip">' + i + ':00 - ' + profile.hours[i] + ' txs</div></div>';
+        labelsHtml += '<span>' + (i % 3 === 0 ? i : '') + '</span>';
+    }
+    document.getElementById('hoursChart').innerHTML = barsHtml;
+    document.getElementById('hoursLabels').innerHTML = labelsHtml;
+
+    // Top tokens (top 20)
+    const topTokens = profile.tokenStats.slice(0, 20);
+    document.getElementById('topTokens').innerHTML = topTokens.map(t => {
+        const pColor = t.pnl >= 0 ? 'green' : 'red';
+        const pSign = t.pnl >= 0 ? '+' : '';
+        const badge = t.pnl >= 0 ? 'badge-win' : 'badge-loss';
+        return '<div class="token-card">' +
+            '<div><div class="name"><a href="https://birdeye.so/token/' + t.mint + '?chain=solana" target="_blank" class="token-link">' + tokenName(t.mint) + '</a></div>' +
+            '<div class="meta">' + t.buys + ' buys, ' + t.sells + ' sells | ' + t.buySOL.toFixed(2) + ' SOL in</div></div>' +
+            '<div><div class="pnl ' + pColor + '">' + pSign + t.pnl.toFixed(2) + ' SOL</div>' +
+            '<div class="pnl-sub"><span class="' + badge + '">' + (t.pnl >= 0 ? 'WIN' : 'LOSS') + '</span></div></div></div>';
+    }).join('');
+
+    // Recent trades (last 50 swaps, newest first)
+    const recent = swaps.slice(-50).reverse();
+    // Build hold time map: for sells, find matching buy
+    const tokenBuys = {};
+    for (const s of swaps) {
+        if (s.type === 'BUY') {
+            if (!tokenBuys[s.token]) tokenBuys[s.token] = [];
+            tokenBuys[s.token].push(s);
+        }
+    }
+
+    document.getElementById('tradesBody').innerHTML = recent.map(s => {
+        const typeClass = s.type === 'BUY' ? 'green' : 'red';
+        let holdStr = '--';
+        if (s.type === 'SELL' && tokenBuys[s.token] && tokenBuys[s.token].length) {
+            const lastBuy = tokenBuys[s.token].filter(b => b.timestamp < s.timestamp).pop();
+            if (lastBuy) holdStr = formatHoldTime(s.timestamp - lastBuy.timestamp);
+        }
+        // Simple PnL for sells
+        let pnlStr = '--';
+        if (s.type === 'SELL') {
+            const ts = profile.tokenStats.find(t => t.mint === s.token);
+            if (ts) {
+                // Proportional PnL estimate
+                const ratio = s.solAmount / Math.max(ts.totalSellSOL, 0.001);
+                const est = ts.pnl * ratio;
+                pnlStr = '<span class="' + (est >= 0 ? 'green' : 'red') + '">' + (est >= 0 ? '+' : '') + est.toFixed(2) + '</span>';
+            }
+        }
+        return '<tr>' +
+            '<td>' + formatTime(s.timestamp) + '</td>' +
+            '<td><span class="' + typeClass + '">' + s.type + '</span></td>' +
+            '<td><a href="https://birdeye.so/token/' + s.token + '?chain=solana" target="_blank" class="token-link">' + tokenName(s.token) + '</a></td>' +
+            '<td>' + s.solAmount.toFixed(3) + '</td>' +
+            '<td>' + pnlStr + '</td>' +
+            '<td>' + holdStr + '</td>' +
+            '<td class="links">' +
+                '<a href="https://solscan.io/tx/' + s.sig + '" target="_blank" class="solscan">Tx</a>' +
+            '</td></tr>';
+    }).join('');
+}
+
+async function analyze() {
+    apiKey = getApiKey();
+    if (!apiKey) return;
+
+    const wallet = document.getElementById('walletInput').value.trim();
+    if (!wallet || wallet.length < 32) return alert('Enter a valid wallet address');
+
+    const limit = parseInt(document.getElementById('txCount').value);
+
+    setProgress(0, 'Fetching transactions...');
+    const txs = await fetchTxs(wallet, limit);
+    if (!txs.length) {
+        hideProgress();
+        return alert('No transactions found for this wallet');
+    }
+
+    setProgress(70, 'Parsing ' + txs.length + ' transactions...');
+    const swaps = parseSwaps(txs, wallet);
+
+    if (!swaps.length) {
+        hideProgress();
+        return alert('No swaps found in ' + txs.length + ' transactions');
+    }
+
+    setProgress(80, 'Resolving token names...');
+    const uniqueMints = [...new Set(swaps.map(s => s.token))];
+    await resolveTokenNames(uniqueMints);
+
+    setProgress(90, 'Computing profile...');
+    const profile = computeProfile(swaps);
+
+    setProgress(100, 'Done!');
+    await sleep(300);
+    hideProgress();
+
+    renderProfile(wallet, profile, swaps);
+}
+
+// Allow Enter key
+document.getElementById('walletInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') analyze();
+});
+
+// Check URL params
+const params = new URLSearchParams(location.search);
+if (params.get('wallet')) {
+    document.getElementById('walletInput').value = params.get('wallet');
+    setTimeout(analyze, 500);
+}
+</script>
+</body>
+</html>
