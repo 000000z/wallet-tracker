@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overlap Detector - Chillz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.header { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 18px; color: #7dd3fc; }
+.nav-links { display: flex; gap: 8px; }
+.nav-links a, .nav-links button { color: #666; text-decoration: none; font-size: 12px; padding: 4px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: none; cursor: pointer; font-family: inherit; }
+.nav-links a:hover, .nav-links button:hover { color: #7dd3fc; border-color: #7dd3fc33; }
+
+.input-section { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; }
+.input-section textarea { width: 100%; background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 12px; border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 80px; }
+.input-section textarea:focus { outline: none; border-color: #7dd3fc; }
+.input-section textarea::placeholder { color: #444; }
+.input-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; border: 1px solid; transition: all 0.15s; }
+.btn-primary { background: #7dd3fc22; border-color: #7dd3fc44; color: #7dd3fc; }
+.btn-primary:hover { background: #7dd3fc33; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.options label { color: #666; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.options input[type=number] { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; width: 60px; }
+
+.progress-section { padding: 16px 24px; display: none; }
+.progress-bar { background: #1a1a2e; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { background: #7dd3fc; height: 100%; width: 0%; transition: width 0.3s; }
+.progress-text { color: #666; font-size: 12px; }
+
+.results-section { padding: 16px 24px; display: none; }
+.results-section h2 { font-size: 15px; color: #7dd3fc; margin-bottom: 12px; }
+.overlap-card { background: #12121a; border: 1px solid #1e1e2e; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.overlap-card:hover { border-color: #2a2a3e; }
+.token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.token-name { font-size: 14px; font-weight: 600; color: #e0e0e0; }
+.token-addr { font-size: 11px; color: #7dd3fc; text-decoration: none; }
+.token-addr:hover { text-decoration: underline; }
+.buyer-count { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+.buyer-count.hot { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; }
+.buyer-count.warm { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b33; }
+.buyer-count.mild { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; }
+.buyers-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.buyer-tag { display: inline-flex; align-items: center; gap: 4px; background: #1a1a2e; border: 1px solid #2a2a3e; padding: 3px 8px; border-radius: 4px; font-size: 11px; }
+.buyer-tag a { color: #7dd3fc; text-decoration: none; }
+.buyer-tag a:hover { text-decoration: underline; }
+.buyer-tag .action { color: #22c55e; font-size: 10px; font-weight: 600; }
+.buyer-tag .action.sell { color: #ef4444; }
+.token-links { display: flex; gap: 6px; margin-top: 8px; }
+.token-links a { font-size: 11px; padding: 2px 8px; border-radius: 4px; text-decoration: none; }
+.token-links .birdeye { background: #22c55e22; color: #22c55e; }
+.token-links .dexscreener { background: #3b82f622; color: #3b82f6; }
+.token-links .solscan { background: #8b5cf622; color: #8b5cf6; }
+
+.summary-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.summary-stat { background: #1a1a2e; border: 1px solid #2a2a3e; padding: 8px 16px; border-radius: 8px; text-align: center; }
+.summary-stat .num { font-size: 20px; font-weight: 700; color: #7dd3fc; }
+.summary-stat .label { font-size: 11px; color: #666; margin-top: 2px; }
+
+.empty-state { text-align: center; padding: 80px 24px; color: #444; }
+.empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+
+.min-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.min-filter label { color: #666; font-size: 12px; }
+.min-filter select { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Overlap Detector</h1>
+    <div class="nav-links">
+        <a href="index.html">Explorer</a>
+        <a href="discover.html">Discover</a>
+        <button onclick="localStorage.removeItem('helius_api_key');location.reload();">Change Key</button>
+    </div>
+</div>
+
+<div class="input-section">
+    <textarea id="walletsInput" placeholder="Paste wallet addresses (one per line)...&#10;&#10;Example:&#10;ADvatX4sqvxQqjTMpHubWQYmMqeP7fSYYDLMf4frmHu9&#10;C21R6y1fqFUN..."></textarea>
+    <div class="input-row">
+        <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Find Overlaps</button>
+        <div class="options">
+            <label>Txs per wallet: <input type="number" id="txLimit" value="100" min="20" max="500" step="20"></label>
+            <label>Delay (ms): <input type="number" id="delayMs" value="100" min="50" max="2000" step="50"></label>
+        </div>
+    </div>
+</div>
+
+<div class="progress-section" id="progressSection">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">Starting...</div>
+</div>
+
+<div class="results-section" id="resultsSection">
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="min-filter">
+        <label>Min wallets overlap:</label>
+        <select id="minOverlap" onchange="renderResults()">
+            <option value="2">2+</option>
+            <option value="3">3+</option>
+            <option value="4">4+</option>
+            <option value="5">5+</option>
+        </select>
+        <label style="margin-left:12px;">Sort by:</label>
+        <select id="sortBy" onchange="renderResults()">
+            <option value="buyers">Most wallets</option>
+            <option value="recent">Most recent</option>
+        </select>
+    </div>
+    <div id="overlapResults"></div>
+</div>
+
+<div class="empty-state" id="emptyState">
+    <h2>Find token overlaps between wallets</h2>
+    <p>Paste multiple wallet addresses above. The tool scans their recent swaps and finds tokens that multiple wallets bought.</p>
+</div>
+
+<script>
+function getApiKey() {
+    let key = localStorage.getItem('helius_api_key');
+    if (!key) {
+        key = prompt('Enter your Helius API key:');
+        if (key) localStorage.setItem('helius_api_key', key);
+    }
+    return key;
+}
+let API_KEY = getApiKey();
+const ENHANCED = 'https://api-mainnet.helius-rpc.com/v0/addresses';
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function enhancedTxs(addr, limit, before) {
+    let url = ENHANCED + '/' + addr + '/transactions?api-key=' + API_KEY + '&limit=' + limit;
+    if (before) url += '&before=' + before;
+    const resp = await fetch(url);
+    return resp.json();
+}
+
+let overlaps = {}; // tokenMint -> { name, wallets: Set, details: [{wallet, action, timestamp}] }
+let isRunning = false;
+
+function setProgress(pct, text) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = text;
+}
+
+async function startScan() {
+    if (isRunning) return;
+    
+    const input = document.getElementById('walletsInput').value.trim();
+    const wallets = input.split('\n').map(l => l.trim()).filter(l => l.length >= 32);
+    if (wallets.length < 2) return alert('Need at least 2 wallet addresses');
+    
+    isRunning = true;
+    overlaps = {};
+    document.getElementById('scanBtn').disabled = true;
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
+    
+    const txLimit = parseInt(document.getElementById('txLimit').value) || 100;
+    const delayMs = parseInt(document.getElementById('delayMs').value) || 100;
+    
+    // Known junk tokens to ignore (SOL, USDC, USDT, etc)
+    const IGNORE_TOKENS = new Set([
+        'So11111111111111111111111111111111111111112', // Wrapped SOL
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+        'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+    ]);
+    
+    for (let i = 0; i < wallets.length; i++) {
+        const wallet = wallets[i];
+        const short = wallet.slice(0, 6) + '...' + wallet.slice(-4);
+        setProgress(Math.floor((i / wallets.length) * 100), 'Scanning ' + (i + 1) + '/' + wallets.length + ' - ' + short);
+        
+        try {
+            // Fetch transactions
+            let allTxs = [];
+            let beforeSig = null;
+            while (allTxs.length < txLimit) {
+                const page = await enhancedTxs(wallet, 50, beforeSig);
+                await sleep(delayMs);
+                if (!page || !page.length) break;
+                allTxs = allTxs.concat(page);
+                if (page.length < 50) break;
+                beforeSig = page[page.length - 1].signature;
+            }
+            
+            // Extract swap tokens
+            for (const tx of allTxs) {
+                if (!tx.type || !/SWAP/.test(tx.type)) continue;
+                if (!tx.tokenTransfers) continue;
+                
+                for (const tt of tx.tokenTransfers) {
+                    const mint = tt.mint;
+                    if (!mint || IGNORE_TOKENS.has(mint)) continue;
+                    
+                    // Determine if buy or sell based on transfer direction
+                    const isBuy = tt.toUserAccount === wallet;
+                    const action = isBuy ? 'BUY' : 'SELL';
+                    
+                    if (!overlaps[mint]) {
+                        overlaps[mint] = { 
+                            wallets: new Set(), 
+                            details: [],
+                            name: tt.tokenStandard || '',
+                            latestTimestamp: 0
+                        };
+                    }
+                    overlaps[mint].wallets.add(wallet);
+                    overlaps[mint].details.push({ 
+                        wallet, 
+                        action, 
+                        timestamp: tx.timestamp || 0,
+                        short: short
+                    });
+                    if ((tx.timestamp || 0) > overlaps[mint].latestTimestamp) {
+                        overlaps[mint].latestTimestamp = tx.timestamp || 0;
+                    }
+                }
+            }
+            
+        } catch (e) {
+            console.error('Error scanning ' + short, e);
+        }
+    }
+    
+    setProgress(100, 'Done! Analyzing overlaps...');
+    
+    document.getElementById('resultsSection').style.display = 'block';
+    renderResults();
+    
+    isRunning = false;
+    document.getElementById('scanBtn').disabled = false;
+}
+
+function renderResults() {
+    const minOverlap = parseInt(document.getElementById('minOverlap').value) || 2;
+    const sortBy = document.getElementById('sortBy').value;
+    
+    // Filter to tokens with minimum overlap
+    let tokens = Object.entries(overlaps)
+        .filter(([mint, data]) => data.wallets.size >= minOverlap)
+        .map(([mint, data]) => ({
+            mint,
+            buyerCount: data.wallets.size,
+            wallets: Array.from(data.wallets),
+            details: data.details,
+            latestTimestamp: data.latestTimestamp
+        }));
+    
+    // Sort
+    if (sortBy === 'buyers') {
+        tokens.sort((a, b) => b.buyerCount - a.buyerCount);
+    } else {
+        tokens.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+    }
+    
+    // Summary
+    const totalTokens = Object.keys(overlaps).length;
+    const overlapTokens = tokens.length;
+    const hotTokens = tokens.filter(t => t.buyerCount >= 3).length;
+    
+    document.getElementById('summaryBar').innerHTML = 
+        '<div class="summary-stat"><div class="num">' + totalTokens + '</div><div class="label">Total tokens</div></div>' +
+        '<div class="summary-stat"><div class="num">' + overlapTokens + '</div><div class="label">Overlapping (' + minOverlap + '+)</div></div>' +
+        '<div class="summary-stat"><div class="num">' + hotTokens + '</div><div class="label">Hot (3+ wallets)</div></div>';
+    
+    // Render cards
+    if (tokens.length === 0) {
+        document.getElementById('overlapResults').innerHTML = '<div style="text-align:center;padding:40px;color:#666;">No overlaps found with ' + minOverlap + '+ wallets</div>';
+        return;
+    }
+    
+    document.getElementById('overlapResults').innerHTML = tokens.slice(0, 100).map(t => {
+        const countClass = t.buyerCount >= 4 ? 'hot' : t.buyerCount >= 3 ? 'warm' : 'mild';
+        const shortMint = t.mint.slice(0, 6) + '...' + t.mint.slice(-4);
+        
+        // Group details by wallet, show latest action
+        const walletActions = {};
+        for (const d of t.details) {
+            if (!walletActions[d.wallet] || d.timestamp > walletActions[d.wallet].timestamp) {
+                walletActions[d.wallet] = d;
+            }
+        }
+        
+        const buyerTags = t.wallets.map(w => {
+            const short = w.slice(0, 6) + '...' + w.slice(-4);
+            const detail = walletActions[w];
+            const actionClass = detail && detail.action === 'SELL' ? 'action sell' : 'action';
+            const actionText = detail ? detail.action : '?';
+            return '<span class="buyer-tag"><a href="https://solscan.io/account/' + w + '" target="_blank">' + short + '</a> <span class="' + actionClass + '">' + actionText + '</span></span>';
+        }).join('');
+        
+        const timeStr = t.latestTimestamp ? new Date(t.latestTimestamp * 1000).toLocaleString() : 'Unknown';
+        
+        return '<div class="overlap-card">' +
+            '<div class="token-header">' +
+                '<div><span class="token-name">' + shortMint + '</span> <span style="color:#666;font-size:11px;">Last activity: ' + timeStr + '</span></div>' +
+                '<span class="buyer-count ' + countClass + '">' + t.buyerCount + ' wallets</span>' +
+            '</div>' +
+            '<div class="buyers-list">' + buyerTags + '</div>' +
+            '<div class="token-links">' +
+                '<a href="https://birdeye.so/token/' + t.mint + '?chain=solana" target="_blank" class="birdeye">Birdeye</a>' +
+                '<a href="https://dexscreener.com/solana/' + t.mint + '" target="_blank" class="dexscreener">DexScreener</a>' +
+                '<a href="https://solscan.io/token/' + t.mint + '" target="_blank" class="solscan">Solscan</a>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+</script>
+</body>
+</html>
