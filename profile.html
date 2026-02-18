@@ -715,10 +715,9 @@ function computeData(swaps, balances, days) {
     const solBal = balances['SOL_NATIVE'] || 0;
     const tradeableBal = active.reduce((a, e) => a + e.remaining, 0);
 
-    // Stablecoin check
-    const stablecoins = ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'];
+    // Stablecoin check — sum all stablecoin balances (value = 1 USD each)
     let stableBal = 0;
-    for (const s of stablecoins) stableBal += (balances[s] || 0);
+    for (const s of STABLECOINS) stableBal += (balances[s] || 0);
 
     // Hours
     const hours = new Array(24).fill(0);
