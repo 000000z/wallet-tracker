@@ -10,23 +10,20 @@ function getApiKey() {
     return key;
 }
 
-// --- Helius Usage Tracker ---
-function trackHeliusCall() {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = JSON.parse(localStorage.getItem('helius_usage') || '{}');
-    if (!data[today]) data[today] = 0;
-    data[today]++;
-    // Clean old days (keep 7 days)
-    const keys = Object.keys(data).sort();
-    while (keys.length > 7) { delete data[keys.shift()]; }
-    localStorage.setItem('helius_usage', JSON.stringify(data));
-    updateTrackers();
+// --- Helius Usage Tracker (real dashboard data + local increment) ---
+function getHeliusData() {
+    const def = { used: 0, total: 10000000, cycleStart: '', cycleEnd: '', localCalls: 0, updated: 0 };
+    return Object.assign(def, JSON.parse(localStorage.getItem('helius_data') || '{}'));
 }
-
-function getHeliusUsage() {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = JSON.parse(localStorage.getItem('helius_usage') || '{}');
-    return { today: data[today] || 0, total: Object.values(data).reduce((a, b) => a + b, 0) };
+function saveHeliusData(d) {
+    d.updated = Date.now();
+    localStorage.setItem('helius_data', JSON.stringify(d));
+}
+function trackHeliusCall() {
+    const d = getHeliusData();
+    d.localCalls = (d.localCalls || 0) + 1;
+    saveHeliusData(d);
+    updateTrackers();
 }
 
 // Patched fetch to auto-track Helius calls
@@ -39,14 +36,14 @@ window.fetch = function(...args) {
     return _origFetch.apply(this, args);
 };
 
-// --- Claude Usage (manual tracker) ---
-function getClaudeUsage() {
-    const data = JSON.parse(localStorage.getItem('claude_usage') || '{"used":0,"limit":0,"note":""}');
-    return data;
+// --- Claude Usage Tracker (real data) ---
+function getClaudeData() {
+    const def = { used: 0, limit: 0, plan: '', resetDate: '', updated: 0 };
+    return Object.assign(def, JSON.parse(localStorage.getItem('claude_data') || '{}'));
 }
-function setClaudeUsage(used, limit) {
-    localStorage.setItem('claude_usage', JSON.stringify({ used, limit, updated: Date.now() }));
-    updateTrackers();
+function saveClaudeData(d) {
+    d.updated = Date.now();
+    localStorage.setItem('claude_data', JSON.stringify(d));
 }
 
 // --- Sidebar + Top Bar ---
@@ -80,22 +77,40 @@ function injectLayout() {
             '</button>' +
         '</div>';
     
-    // Create top bar
+    // Create top bar with real tracker cards
     const topbar = document.createElement('div');
     topbar.id = 'topbar';
     topbar.innerHTML = 
-        '<div class="tracker" id="heliusTracker">' +
-            '<span class="tracker-label">Helius</span>' +
-            '<span class="tracker-value" id="heliusCount">0</span>' +
-            '<span class="tracker-sub">today</span>' +
+        '<div class="tracker-card" id="heliusCard" onclick="promptHeliusData()" title="Click to sync from Helius dashboard">' +
+            '<div class="tracker-header">' +
+                '<span class="tracker-dot helius-dot"></span>' +
+                '<span class="tracker-title">Helius</span>' +
+            '</div>' +
+            '<div class="tracker-bar-wrap"><div class="tracker-bar helius-bar" id="heliusBar"></div></div>' +
+            '<div class="tracker-stats">' +
+                '<span id="heliusUsed">--</span>' +
+                '<span class="tracker-sep">/</span>' +
+                '<span id="heliusTotal">--</span>' +
+                '<span class="tracker-unit">credits</span>' +
+            '</div>' +
+            '<div class="tracker-meta" id="heliusMeta">click to sync</div>' +
         '</div>' +
-        '<div class="tracker" id="claudeTracker" onclick="promptClaudeUsage()" style="cursor:pointer;" title="Click to update">' +
-            '<span class="tracker-label">Claude</span>' +
-            '<span class="tracker-value" id="claudeCount">--</span>' +
-            '<span class="tracker-sub" id="claudeSub">click to set</span>' +
+        '<div class="tracker-card" id="claudeCard" onclick="promptClaudeData()" title="Click to sync from Claude dashboard">' +
+            '<div class="tracker-header">' +
+                '<span class="tracker-dot claude-dot"></span>' +
+                '<span class="tracker-title">Claude</span>' +
+            '</div>' +
+            '<div class="tracker-bar-wrap"><div class="tracker-bar claude-bar" id="claudeBar"></div></div>' +
+            '<div class="tracker-stats">' +
+                '<span id="claudeUsed">--</span>' +
+                '<span class="tracker-sep">/</span>' +
+                '<span id="claudeTotal">--</span>' +
+                '<span class="tracker-unit" id="claudeUnit">msgs</span>' +
+            '</div>' +
+            '<div class="tracker-meta" id="claudeMeta">click to sync</div>' +
         '</div>' +
         '<div class="tracker-spacer"></div>' +
-        '<button onclick="resetHeliusCount()" style="background:none;border:1px solid #2a2a3e;color:#666;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;">Reset Helius</button>';
+        '<div class="tracker-local" id="localCallsDisplay" title="API calls made from this site since last sync">+<span id="localCalls">0</span> local</div>';
     
     // Wrap existing body content
     const content = document.createElement('div');
@@ -111,46 +126,117 @@ function injectLayout() {
     updateTrackers();
 }
 
+function formatNum(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toString();
+}
+
+function timeAgo(ts) {
+    if (!ts) return '';
+    const m = Math.round((Date.now() - ts) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.round(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.round(h / 24) + 'd ago';
+}
+
 function updateTrackers() {
-    const h = getHeliusUsage();
-    const hEl = document.getElementById('heliusCount');
-    if (hEl) hEl.textContent = h.today.toLocaleString();
+    // Helius
+    const h = getHeliusData();
+    const hUsed = document.getElementById('heliusUsed');
+    const hTotal = document.getElementById('heliusTotal');
+    const hBar = document.getElementById('heliusBar');
+    const hMeta = document.getElementById('heliusMeta');
+    const localEl = document.getElementById('localCalls');
     
-    const c = getClaudeUsage();
-    const cEl = document.getElementById('claudeCount');
-    const cSub = document.getElementById('claudeSub');
-    if (cEl && c.limit) {
-        cEl.textContent = c.used + '/' + c.limit;
-        const pct = Math.round((c.used / c.limit) * 100);
-        cEl.style.color = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e';
-        if (cSub) {
-            const ago = c.updated ? Math.round((Date.now() - c.updated) / 60000) : 0;
-            cSub.textContent = ago < 60 ? ago + 'm ago' : Math.round(ago / 60) + 'h ago';
+    if (hUsed && h.total > 0) {
+        const effectiveUsed = h.used + (h.localCalls || 0);
+        hUsed.textContent = formatNum(effectiveUsed);
+        hTotal.textContent = formatNum(h.total);
+        const pct = Math.min(100, (effectiveUsed / h.total) * 100);
+        if (hBar) {
+            hBar.style.width = pct + '%';
+            hBar.className = 'tracker-bar helius-bar' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
+        }
+        if (hMeta) {
+            let meta = '';
+            if (h.cycleEnd) {
+                const daysLeft = Math.ceil((new Date(h.cycleEnd) - new Date()) / 86400000);
+                meta = daysLeft + 'd left';
+            }
+            if (h.updated) meta += (meta ? ' | ' : '') + 'synced ' + timeAgo(h.updated);
+            hMeta.textContent = meta || 'click to sync';
+        }
+    }
+    if (localEl) localEl.textContent = h.localCalls || 0;
+    
+    // Claude
+    const c = getClaudeData();
+    const cUsed = document.getElementById('claudeUsed');
+    const cTotal = document.getElementById('claudeTotal');
+    const cBar = document.getElementById('claudeBar');
+    const cMeta = document.getElementById('claudeMeta');
+    const cUnit = document.getElementById('claudeUnit');
+    
+    if (cUsed && c.limit > 0) {
+        cUsed.textContent = c.used;
+        cTotal.textContent = c.limit;
+        if (cUnit) cUnit.textContent = c.plan || 'msgs';
+        const pct = Math.min(100, (c.used / c.limit) * 100);
+        if (cBar) {
+            cBar.style.width = pct + '%';
+            cBar.className = 'tracker-bar claude-bar' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
+        }
+        if (cMeta) {
+            let meta = '';
+            if (c.resetDate) meta = 'resets ' + c.resetDate;
+            if (c.updated) meta += (meta ? ' | ' : '') + 'synced ' + timeAgo(c.updated);
+            cMeta.textContent = meta || 'click to sync';
         }
     }
 }
 
-function promptClaudeUsage() {
-    const current = getClaudeUsage();
-    const input = prompt('Claude usage (used/limit, e.g. 150/500):', current.limit ? current.used + '/' + current.limit : '');
+function promptHeliusData() {
+    const current = getHeliusData();
+    const input = prompt(
+        'Sync from Helius dashboard:\n' +
+        'Format: used / total / cycle-end\n' +
+        'Example: 374394 / 10000000 / 2026-03-17',
+        (current.used || 374394) + ' / ' + (current.total || 10000000) + ' / ' + (current.cycleEnd || '2026-03-17')
+    );
     if (!input) return;
-    const parts = input.split('/');
-    if (parts.length === 2) {
-        setClaudeUsage(parseInt(parts[0]) || 0, parseInt(parts[1]) || 500);
-    }
+    const parts = input.split('/').map(s => s.trim());
+    const d = getHeliusData();
+    d.used = parseInt(parts[0]) || 0;
+    d.total = parseInt(parts[1]) || 10000000;
+    if (parts[2]) d.cycleEnd = parts[2];
+    d.localCalls = 0; // reset local counter on sync
+    saveHeliusData(d);
+    updateTrackers();
+}
+
+function promptClaudeData() {
+    const current = getClaudeData();
+    const input = prompt(
+        'Sync from Claude dashboard:\n' +
+        'Format: used / limit\n' +
+        'Example: 45 / 45 for Opus messages',
+        (current.used || 0) + ' / ' + (current.limit || 45)
+    );
+    if (!input) return;
+    const parts = input.split('/').map(s => s.trim());
+    const d = getClaudeData();
+    d.used = parseInt(parts[0]) || 0;
+    d.limit = parseInt(parts[1]) || 45;
+    saveClaudeData(d);
+    updateTrackers();
 }
 
 function changeApiKey() {
     localStorage.removeItem('helius_api_key');
     location.reload();
-}
-
-function resetHeliusCount() {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = JSON.parse(localStorage.getItem('helius_usage') || '{}');
-    data[today] = 0;
-    localStorage.setItem('helius_usage', JSON.stringify(data));
-    updateTrackers();
 }
 
 // Inject on load

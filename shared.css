@@ -87,53 +87,98 @@ body { margin: 0; padding: 0; }
     top: 0;
     left: 180px;
     right: 0;
-    height: 40px;
+    height: 56px;
     background: #0d0d14;
     border-bottom: 1px solid #1e1e2e;
     z-index: 199;
     display: flex;
     align-items: center;
     padding: 0 16px;
-    gap: 16px;
+    gap: 12px;
 }
 
-.tracker {
+.tracker-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: #12121a;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #1e1e2e;
+    cursor: pointer;
+    min-width: 180px;
+    transition: border-color 0.15s;
+}
+.tracker-card:hover { border-color: #333; }
+
+.tracker-header {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #12121a;
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid #1e1e2e;
 }
+.tracker-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+}
+.helius-dot { background: #f59e0b; }
+.claude-dot { background: #7dd3fc; }
 
-.tracker-label {
+.tracker-title {
     font-size: 10px;
-    color: #666;
+    color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-.tracker-value {
-    font-size: 13px;
     font-weight: 600;
-    color: #7dd3fc;
 }
 
-.tracker-sub {
-    font-size: 10px;
+.tracker-bar-wrap {
+    height: 3px;
+    background: #1e1e2e;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.tracker-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+    width: 0%;
+}
+.tracker-bar.helius-bar { background: #f59e0b; }
+.tracker-bar.claude-bar { background: #7dd3fc; }
+.tracker-bar.warn { background: #f59e0b; }
+.tracker-bar.danger { background: #ef4444; }
+
+.tracker-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+.tracker-sep { color: #444; font-weight: 400; }
+.tracker-unit { color: #555; font-size: 10px; font-weight: 400; margin-left: 2px; }
+
+.tracker-meta {
+    font-size: 9px;
     color: #444;
 }
 
-.tracker-spacer {
-    flex: 1;
+.tracker-spacer { flex: 1; }
+
+.tracker-local {
+    font-size: 10px;
+    color: #555;
+    background: #12121a;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #1e1e2e;
 }
 
 /* Main content offset */
 #main-content {
     margin-left: 180px;
-    margin-top: 40px;
-    min-height: calc(100vh - 40px);
+    margin-top: 56px;
+    min-height: calc(100vh - 56px);
 }
 
 /* Remove old headers since we have sidebar now */
