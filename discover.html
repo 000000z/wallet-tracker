@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Discovery - Chillz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.header { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 18px; color: #7dd3fc; }
+.header a { color: #666; text-decoration: none; font-size: 12px; }
+.header a:hover { color: #7dd3fc; }
+
+.search-section { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; }
+.search-row { display: flex; gap: 8px; align-items: center; }
+.search-input { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-family: inherit; flex: 1; }
+.search-input:focus { outline: none; border-color: #7dd3fc; }
+.search-input::placeholder { color: #444; }
+.btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; border: 1px solid; transition: all 0.15s; }
+.btn-primary { background: #7dd3fc22; border-color: #7dd3fc44; color: #7dd3fc; }
+.btn-primary:hover { background: #7dd3fc33; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-green { background: #22c55e22; border-color: #22c55e44; color: #22c55e; }
+.btn-green:hover { background: #22c55e33; }
+.btn-red { background: #ef444422; border-color: #ef444444; color: #ef4444; }
+.btn-red:hover { background: #ef444433; }
+.btn-export { background: #3b82f622; border-color: #3b82f644; color: #3b82f6; }
+.btn-export:hover { background: #3b82f633; }
+
+.options { display: flex; gap: 16px; margin-top: 10px; align-items: center; }
+.options label { color: #666; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.options select, .options input[type=number] { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; }
+
+.progress-section { padding: 16px 24px; display: none; }
+.progress-bar { background: #1a1a2e; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { background: #7dd3fc; height: 100%; width: 0%; transition: width 0.3s; }
+.progress-text { color: #666; font-size: 12px; }
+.progress-log { max-height: 120px; overflow-y: auto; margin-top: 8px; font-size: 11px; color: #555; }
+.progress-log div { padding: 1px 0; }
+.progress-log .ok { color: #22c55e; }
+.progress-log .platform { color: #3b82f6; }
+.progress-log .cex { color: #6b7280; }
+.progress-log .xfer { color: #8b5cf6; }
+.progress-log .err { color: #ef4444; }
+
+.stats-bar { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 8px 24px; display: none; gap: 12px; align-items: center; flex-wrap: wrap; }
+.stat { padding: 4px 10px; border-radius: 6px; font-size: 12px; }
+.stat.human { background: #1a1a2e; border: 1px solid #22c55e33; color: #22c55e; }
+.stat.platform { background: #1a1a2e; border: 1px solid #3b82f633; color: #3b82f6; }
+.stat.cex { background: #1a1a2e; border: 1px solid #6b728033; color: #6b7280; }
+.stat.xfer { background: #1a1a2e; border: 1px solid #8b5cf633; color: #8b5cf6; }
+.stat.recv { background: #1a1a2e; border: 1px solid #64748b33; color: #64748b; }
+
+.actions-bar { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 8px 24px; display: none; gap: 8px; align-items: center; }
+.selected-count { color: #666; font-size: 11px; margin-left: 8px; }
+
+.filters-bar { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 8px 24px; display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
+.filter-btn { background: #1a1a2e; border: 1px solid #2a2a3e; color: #999; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.15s; }
+.filter-btn:hover { border-color: #444; color: #ccc; }
+.filter-btn.active { border-color: #7dd3fc; color: #7dd3fc; background: #7dd3fc11; }
+
+.table-wrap { padding: 0 24px 24px; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #12121a; position: sticky; top: 0; z-index: 10; text-align: left; padding: 10px 8px; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #1e1e2e; cursor: pointer; user-select: none; }
+th:hover { color: #999; }
+th.sorted { color: #7dd3fc; }
+td { padding: 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
+tr:hover { background: #ffffff05; }
+tr.selected { background: #22c55e08; }
+tr.rejected { opacity: 0.3; }
+
+.addr { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.addr a { color: #7dd3fc; text-decoration: none; }
+.addr a:hover { text-decoration: underline; }
+.copy-btn { cursor: pointer; opacity: 0.3; font-size: 10px; }
+.copy-btn:hover { opacity: 1; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge.human { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; }
+.badge.platform { background: #3b82f622; color: #3b82f6; border: 1px solid #3b82f633; }
+.badge.bot { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b33; }
+.badge.cex { background: #6b728022; color: #6b7280; border: 1px solid #6b728033; }
+.badge.xfer { background: #8b5cf622; color: #8b5cf6; border: 1px solid #8b5cf633; }
+.badge.recv { background: #64748b22; color: #64748b; border: 1px solid #64748b33; }
+.badge.dead { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; }
+.badge.tracked { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b33; font-size: 10px; margin-left: 4px; }
+
+.sol-bal { color: #f59e0b; font-weight: 600; }
+.sol-bal.zero { color: #444; font-weight: normal; }
+.swap-count { color: #22c55e; font-weight: 600; }
+.swap-count.zero { color: #444; font-weight: normal; }
+
+.links { display: flex; gap: 4px; }
+.links a { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; text-decoration: none; }
+.links .solscan { background: #3b82f622; color: #3b82f6; }
+.links .solscan:hover { background: #3b82f644; }
+.links .birdeye { background: #22c55e22; color: #22c55e; }
+.links .birdeye:hover { background: #22c55e44; }
+
+.sol-amount { font-size: 11px; color: #f59e0b; }
+.checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #22c55e; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: #000; padding: 8px 16px; border-radius: 6px; font-size: 12px; display: none; z-index: 1000; }
+.empty-state { text-align: center; padding: 80px 24px; color: #444; }
+.empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Wallet Discovery</h1>
+    <div style="display:flex;gap:8px;">
+        <a href="index.html" style="color:#666;text-decoration:none;font-size:12px;padding:4px 12px;border:1px solid #2a2a3e;border-radius:6px;">Explorer</a>
+        <button onclick="localStorage.removeItem('helius_api_key');API_KEY=getApiKey();" style="background:none;border:1px solid #2a2a3e;color:#666;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;">Change Key</button>
+    </div>
+</div>
+
+<div class="search-section">
+    <div class="search-row">
+        <input type="text" class="search-input" id="addressInput" placeholder="Paste a Solana wallet address...">
+        <button class="btn btn-primary" id="discoverBtn" onclick="startDiscovery()">Discover</button>
+    </div>
+    <div class="options">
+        <label>Max txs to scan: <input type="number" id="maxTxs" value="200" min="50" max="1000" step="50"></label>
+        <label>Classify txs: <input type="number" id="classifyTxs" value="150" min="30" max="300" step="30"></label>
+        <label>Delay (ms): <input type="number" id="delayMs" value="300" min="100" max="2000" step="100"></label>
+    </div>
+</div>
+
+<div class="progress-section" id="progressSection">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">Starting...</div>
+    <div class="progress-log" id="progressLog"></div>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="filters-bar" id="filtersBar">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" data-filter="HUMAN_TRADER" onclick="setFilter('HUMAN_TRADER', this)">Human</button>
+    <button class="filter-btn" data-filter="HUMAN_VIA_PLATFORM" onclick="setFilter('HUMAN_VIA_PLATFORM', this)">Platform</button>
+    <button class="filter-btn" data-filter="TRANSFER_ONLY" onclick="setFilter('TRANSFER_ONLY', this)">Transfer</button>
+    <button class="filter-btn" data-filter="CEX_OR_PROTOCOL" onclick="setFilter('CEX_OR_PROTOCOL', this)">CEX</button>
+    <button class="filter-btn" data-filter="PASSIVE_RECIPIENT" onclick="setFilter('PASSIVE_RECIPIENT', this)">Passive</button>
+</div>
+
+<div class="actions-bar" id="actionsBar">
+    <button class="btn btn-green" onclick="approveSelected()">+ Add to track</button>
+    <button class="btn btn-red" onclick="rejectSelected()">X Reject</button>
+    <button class="btn btn-export" onclick="exportResults()">Export</button>
+    <span class="selected-count" id="selectedCount">0 selected</span>
+</div>
+
+<div class="table-wrap">
+    <table id="resultsTable" style="display:none">
+        <thead>
+        <tr>
+            <th style="width:30px"><input type="checkbox" class="checkbox" onclick="toggleAll(this)"></th>
+            <th data-sort="classification" style="width:100px">Type</th>
+            <th data-sort="solSent">SOL Sent</th>
+            <th data-sort="address">Address</th>
+            <th data-sort="solBalance" style="width:80px">SOL Bal</th>
+            <th data-sort="swapCount" style="width:70px">Swaps</th>
+            <th data-sort="totalSigs" style="width:70px">Txs</th>
+            <th>Reason</th>
+            <th style="width:140px">Links</th>
+            <th style="width:60px">Status</th>
+        </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState">
+        <h2>Paste a wallet address above</h2>
+        <p>Discovers all wallets that received SOL from the target, then classifies them.</p>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function getApiKey() {
+    let key = localStorage.getItem('helius_api_key');
+    if (!key) {
+        key = prompt('Enter your Helius API key:');
+        if (key) localStorage.setItem('helius_api_key', key);
+    }
+    return key;
+}
+let API_KEY = getApiKey();
+const RPC_BASE = 'https://mainnet.helius-rpc.com/?api-key=';
+const ENHANCED = 'https://api-mainnet.helius-rpc.com/v0/addresses';
+
+// Known addresses to skip
+const KNOWN_SKIP = new Set([
+    'AVUCZyuT35YSuj4RH7fwiyPu82Djn2Hfg7y2ND2XcnZH', // Photon fees
+    '11111111111111111111111111111111', // System program
+    'ComputeBudget111111111111111111111111111111',
+    'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+    'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+]);
+
+let results = [];
+let currentFilter = 'all';
+let currentSort = { key: 'solSent', dir: -1 };
+let decisions = {};
+let isRunning = false;
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function rpcCall(method, params) {
+    const resp = await fetch(RPC_BASE + API_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+    });
+    return resp.json();
+}
+
+async function enhancedTxs(addr, limit, before) {
+    let url = ENHANCED + '/' + addr + '/transactions?api-key=' + API_KEY + '&limit=' + limit;
+    if (before) url += '&before=' + before;
+    const resp = await fetch(url);
+    return resp.json();
+}
+
+function log(text, cls) {
+    const el = document.getElementById('progressLog');
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = text;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(pct, text) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = text;
+}
+
+async function startDiscovery() {
+    if (isRunning) return;
+    const addr = document.getElementById('addressInput').value.trim();
+    if (!addr || addr.length < 32) return alert('Enter a valid Solana address');
+    
+    isRunning = true;
+    results = [];
+    decisions = {};
+    document.getElementById('discoverBtn').disabled = true;
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('progressLog').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultsTable').style.display = 'none';
+    document.getElementById('statsBar').style.display = 'none';
+    document.getElementById('filtersBar').style.display = 'none';
+    document.getElementById('actionsBar').style.display = 'none';
+    
+    const maxTxs = parseInt(document.getElementById('maxTxs').value) || 200;
+    const classifyLimit = parseInt(document.getElementById('classifyTxs').value) || 150;
+    const delayMs = parseInt(document.getElementById('delayMs').value) || 300;
+    
+    try {
+        // Step 1: Fetch all transactions from target wallet
+        setProgress(5, 'Fetching transactions from target wallet...');
+        log('Fetching transactions...');
+        
+        let allTxs = [];
+        let beforeSig = null;
+        while (allTxs.length < maxTxs) {
+            const page = await enhancedTxs(addr, 50, beforeSig);
+            if (!page || !page.length) break;
+            allTxs = allTxs.concat(page);
+            if (page.length < 50) break;
+            beforeSig = page[page.length - 1].signature;
+            await sleep(delayMs);
+        }
+        
+        log('Got ' + allTxs.length + ' transactions');
+        setProgress(15, 'Analyzing transfers...');
+        
+        // Step 2: Find unique destination wallets (SOL transfers out)
+        const destinations = {}; // addr -> { totalSol, count }
+        for (const tx of allTxs) {
+            if (!tx.nativeTransfers) continue;
+            for (const t of tx.nativeTransfers) {
+                if (t.fromUserAccount === addr && t.toUserAccount !== addr) {
+                    const dest = t.toUserAccount;
+                    if (KNOWN_SKIP.has(dest)) continue;
+                    if (!destinations[dest]) destinations[dest] = { totalSol: 0, count: 0 };
+                    destinations[dest].totalSol += (t.amount || 0) / 1e9;
+                    destinations[dest].count++;
+                }
+            }
+        }
+        
+        const destAddrs = Object.keys(destinations);
+        log('Found ' + destAddrs.length + ' unique destination wallets');
+        setProgress(20, 'Classifying ' + destAddrs.length + ' wallets...');
+        
+        // Step 3: Classify each destination
+        for (let i = 0; i < destAddrs.length; i++) {
+            const da = destAddrs[i];
+            const info = destinations[da];
+            const short = da.slice(0, 8) + '...' + da.slice(-4);
+            const pct = 20 + Math.floor((i / destAddrs.length) * 75);
+            setProgress(pct, 'Classifying ' + (i + 1) + '/' + destAddrs.length + ' - ' + short);
+            
+            try {
+                // Get account info
+                const acctResp = await rpcCall('getAccountInfo', [da, { encoding: 'jsonParsed' }]);
+                await sleep(delayMs);
+                
+                const acctData = acctResp.result && acctResp.result.value;
+                
+                // Token mint?
+                if (acctData && acctData.data && acctData.data.program === 'spl-token' && acctData.data.parsed && acctData.data.parsed.type === 'mint') {
+                    log(short + ' -> TOKEN_MINT', 'cex');
+                    results.push({ address: da, classification: 'TOKEN_MINT', reason: 'Token mint', solBalance: 0, swapCount: 0, totalSigs: 0, isFeePayer: 0, uniqueInteractors: 0, solSent: info.totalSol, sendCount: info.count });
+                    continue;
+                }
+                
+                // Executable?
+                if (acctData && acctData.executable) {
+                    log(short + ' -> PROGRAM', 'cex');
+                    results.push({ address: da, classification: 'PROGRAM', reason: 'Executable program', solBalance: 0, swapCount: 0, totalSigs: 0, isFeePayer: 0, uniqueInteractors: 0, solSent: info.totalSol, sendCount: info.count });
+                    continue;
+                }
+                
+                const solBalance = acctData ? (acctData.lamports || 0) / 1e9 : 0;
+                
+                // Get enhanced txs for classification
+                let txs = [];
+                let bSig = null;
+                let pages = Math.ceil(classifyLimit / 20);
+                while (pages > 0 && txs.length < classifyLimit) {
+                    const page = await enhancedTxs(da, 20, bSig);
+                    await sleep(delayMs);
+                    if (!page || !page.length) break;
+                    txs = txs.concat(page);
+                    if (page.length < 20) break;
+                    bSig = page[page.length - 1].signature;
+                    pages--;
+                }
+                
+                if (txs.length === 0) {
+                    log(short + ' -> DEAD', 'err');
+                    results.push({ address: da, classification: 'DEAD', reason: 'No transactions', solBalance: Math.round(solBalance * 100) / 100, swapCount: 0, totalSigs: 0, isFeePayer: 0, uniqueInteractors: 0, solSent: info.totalSol, sendCount: info.count });
+                    continue;
+                }
+                
+                // Analyze
+                let swapCount = 0, transferCount = 0, isFeePayer = 0;
+                const sources = {}, types = {}, interactors = {};
+                
+                for (const tx of txs) {
+                    const t = tx.type || 'UNKNOWN';
+                    types[t] = (types[t] || 0) + 1;
+                    if (tx.source) sources[tx.source] = (sources[tx.source] || 0) + 1;
+                    if (/SWAP/.test(t)) swapCount++;
+                    else if (/TRANSFER/.test(t)) transferCount++;
+                    if (tx.feePayer === da) isFeePayer++;
+                    if (tx.feePayer && tx.feePayer !== da) interactors[tx.feePayer] = true;
+                }
+                
+                const uniqueCount = Object.keys(interactors).length;
+                const txCount = txs.length;
+                
+                // Get total sigs
+                const sigResp = await rpcCall('getSignaturesForAddress', [da, { limit: 1000 }]);
+                await sleep(delayMs);
+                const totalSigs = sigResp.result ? sigResp.result.length : 0;
+                
+                // Classify
+                let classification = 'UNKNOWN', reason = '';
+                
+                if (uniqueCount > 15 && isFeePayer === 0) {
+                    classification = 'CEX_OR_PROTOCOL';
+                    reason = uniqueCount + ' unique interactors, never fee payer';
+                } else if (totalSigs >= 1000 && isFeePayer === 0) {
+                    classification = 'CEX_OR_PROTOCOL';
+                    reason = totalSigs + '+ txs, never fee payer';
+                } else if (solBalance > 5000 && totalSigs >= 500) {
+                    classification = 'CEX_OR_PROTOCOL';
+                    reason = Math.round(solBalance) + ' SOL, ' + totalSigs + '+ txs';
+                } else if (swapCount > 0 && isFeePayer > 0) {
+                    classification = 'HUMAN_TRADER';
+                    reason = swapCount + ' swaps, fee payer ' + isFeePayer + '/' + txCount + ', ' + Math.round(solBalance * 100) / 100 + ' SOL';
+                } else if (swapCount > 0 && isFeePayer === 0) {
+                    if (uniqueCount > 10) {
+                        classification = 'CEX_OR_PROTOCOL';
+                        reason = swapCount + ' swaps, ' + uniqueCount + ' unique interactors';
+                    } else {
+                        classification = 'HUMAN_VIA_PLATFORM';
+                        reason = swapCount + ' swaps via platform, ' + Math.round(solBalance * 100) / 100 + ' SOL';
+                    }
+                } else if (transferCount > 0 && isFeePayer > 0 && swapCount === 0) {
+                    classification = 'TRANSFER_ONLY';
+                    reason = 'Only transfers, fee payer ' + isFeePayer + '/' + txCount;
+                } else if (transferCount > 0 && isFeePayer === 0 && swapCount === 0) {
+                    if (uniqueCount > 10) {
+                        classification = 'CEX_OR_PROTOCOL';
+                        reason = 'Only transfers, ' + uniqueCount + ' unique senders';
+                    } else {
+                        classification = 'PASSIVE_RECIPIENT';
+                        reason = 'Only receives, ' + Math.round(solBalance * 100) / 100 + ' SOL';
+                    }
+                } else {
+                    reason = 'feePayer: ' + isFeePayer + '/' + txCount + ', bal: ' + Math.round(solBalance * 100) / 100 + ' SOL';
+                }
+                
+                const cls = classification === 'HUMAN_TRADER' ? 'ok' : classification === 'HUMAN_VIA_PLATFORM' ? 'platform' : classification.includes('CEX') ? 'cex' : 'xfer';
+                log(short + ' -> ' + classification + ' (' + swapCount + ' swaps, ' + Math.round(solBalance * 100) / 100 + ' SOL)', cls);
+                
+                results.push({
+                    address: da, classification, reason,
+                    solBalance: Math.round(solBalance * 100) / 100,
+                    swapCount, totalSigs, isFeePayer, uniqueInteractors: uniqueCount,
+                    solSent: Math.round(info.totalSol * 100) / 100,
+                    sendCount: info.count
+                });
+                
+            } catch (e) {
+                log(short + ' -> ERROR: ' + e.message, 'err');
+                results.push({ address: da, classification: 'ERROR', reason: e.message, solBalance: 0, swapCount: 0, totalSigs: 0, isFeePayer: 0, uniqueInteractors: 0, solSent: info.totalSol, sendCount: info.count });
+            }
+        }
+        
+        setProgress(100, 'Done! Found ' + results.length + ' wallets');
+        log('Classification complete!', 'ok');
+        
+        // Show results
+        document.getElementById('resultsTable').style.display = 'table';
+        document.getElementById('statsBar').style.display = 'flex';
+        document.getElementById('filtersBar').style.display = 'flex';
+        document.getElementById('actionsBar').style.display = 'flex';
+        updateStats();
+        renderTable();
+        
+    } catch (e) {
+        log('Fatal error: ' + e.message, 'err');
+        setProgress(0, 'Error: ' + e.message);
+    }
+    
+    isRunning = false;
+    document.getElementById('discoverBtn').disabled = false;
+}
+
+function getBadgeClass(c) {
+    if (c === 'HUMAN_TRADER') return 'human';
+    if (c === 'HUMAN_VIA_PLATFORM') return 'platform';
+    if (c === 'CEX_OR_PROTOCOL') return 'cex';
+    if (c === 'TRANSFER_ONLY') return 'xfer';
+    if (c === 'PASSIVE_RECIPIENT') return 'recv';
+    if (c === 'DEAD' || c === 'ERROR') return 'dead';
+    return 'cex';
+}
+
+function getBadgeLabel(c) {
+    const labels = { 'HUMAN_TRADER': 'Human', 'HUMAN_VIA_PLATFORM': 'Platform', 'CEX_OR_PROTOCOL': 'CEX', 'TRANSFER_ONLY': 'Transfer', 'PASSIVE_RECIPIENT': 'Passive', 'DEAD': 'Dead', 'ERROR': 'Error', 'TOKEN_MINT': 'Mint', 'PROGRAM': 'Program' };
+    return labels[c] || c;
+}
+
+function shortAddr(a) { return a.slice(0, 6) + '...' + a.slice(-4); }
+
+function renderTable() {
+    let filtered = results;
+    if (currentFilter !== 'all') {
+        filtered = results.filter(w => w.classification === currentFilter);
+    }
+    
+    filtered.sort((a, b) => {
+        let av = a[currentSort.key] || 0;
+        let bv = b[currentSort.key] || 0;
+        if (typeof av === 'number') return (av - bv) * currentSort.dir;
+        return String(av).localeCompare(String(bv)) * currentSort.dir;
+    });
+    
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = filtered.map(w => {
+        const bc = getBadgeClass(w.classification);
+        const status = decisions[w.address] || '';
+        const rowClass = status === 'approved' ? 'selected' : status === 'rejected' ? 'rejected' : '';
+        const solClass = (w.solBalance || 0) > 0 ? '' : ' zero';
+        const swapClass = (w.swapCount || 0) > 0 ? '' : ' zero';
+        
+        return '<tr class="' + rowClass + '">' +
+            '<td><input type="checkbox" class="checkbox" data-addr="' + w.address + '" ' + (status === 'approved' ? 'checked' : '') + ' onchange="onCheck(this)"></td>' +
+            '<td><span class="badge ' + bc + '">' + getBadgeLabel(w.classification) + '</span></td>' +
+            '<td class="sol-amount">' + (w.solSent || 0).toFixed(2) + ' SOL</td>' +
+            '<td class="addr"><a href="https://solscan.io/account/' + w.address + '" target="_blank" title="' + w.address + '">' + shortAddr(w.address) + '</a> <span class="copy-btn" onclick="copyAddr(\'' + w.address + '\')">[c]</span></td>' +
+            '<td class="sol-bal' + solClass + '">' + (w.solBalance || 0).toFixed(2) + '</td>' +
+            '<td class="swap-count' + swapClass + '">' + (w.swapCount || 0) + '</td>' +
+            '<td>' + (w.totalSigs || 0) + '</td>' +
+            '<td style="font-size:11px;color:#666;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (w.reason || '') + '">' + (w.reason || '') + '</td>' +
+            '<td class="links"><a href="https://solscan.io/account/' + w.address + '" target="_blank" class="solscan">Solscan</a> <a href="https://birdeye.so/profile/' + w.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a></td>' +
+            '<td style="text-align:center">' + (status === 'approved' ? 'YES' : status === 'rejected' ? 'NO' : '--') + '</td></tr>';
+    }).join('');
+    
+    updateSelectedCount();
+}
+
+function updateStats() {
+    const counts = {};
+    results.forEach(w => { counts[w.classification] = (counts[w.classification] || 0) + 1; });
+    document.getElementById('statsBar').innerHTML =
+        '<span class="stat human">' + (counts.HUMAN_TRADER || 0) + ' human</span>' +
+        '<span class="stat platform">' + (counts.HUMAN_VIA_PLATFORM || 0) + ' platform</span>' +
+        '<span class="stat xfer">' + (counts.TRANSFER_ONLY || 0) + ' xfer</span>' +
+        '<span class="stat recv">' + (counts.PASSIVE_RECIPIENT || 0) + ' passive</span>' +
+        '<span class="stat cex">' + (counts.CEX_OR_PROTOCOL || 0) + ' cex</span>';
+}
+
+function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+}
+
+// Sort
+document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (currentSort.key === key) currentSort.dir *= -1;
+        else { currentSort.key = key; currentSort.dir = -1; }
+        document.querySelectorAll('th').forEach(t => t.classList.remove('sorted'));
+        th.classList.add('sorted');
+        renderTable();
+    });
+});
+
+function onCheck(el) {
+    const addr = el.dataset.addr;
+    if (el.checked) decisions[addr] = 'approved';
+    else delete decisions[addr];
+    renderTable();
+}
+
+function toggleAll(el) {
+    document.querySelectorAll('#tbody .checkbox').forEach(cb => {
+        cb.checked = el.checked;
+        if (el.checked) decisions[cb.dataset.addr] = 'approved';
+        else delete decisions[cb.dataset.addr];
+    });
+    renderTable();
+}
+
+function approveSelected() {
+    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => { decisions[cb.dataset.addr] = 'approved'; });
+    renderTable();
+    showToast(Object.values(decisions).filter(v => v === 'approved').length + ' wallets approved');
+}
+
+function rejectSelected() {
+    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => { decisions[cb.dataset.addr] = 'rejected'; cb.checked = false; });
+    renderTable();
+    showToast('Rejected');
+}
+
+function exportResults() {
+    const approved = results.filter(w => decisions[w.address] === 'approved');
+    if (!approved.length) { showToast('Nothing approved yet'); return; }
+    const json = JSON.stringify(approved, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'discovered_wallets.json'; a.click();
+    showToast(approved.length + ' wallets exported');
+}
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('#tbody .checkbox:checked').length;
+    const approved = Object.values(decisions).filter(v => v === 'approved').length;
+    const rejected = Object.values(decisions).filter(v => v === 'rejected').length;
+    document.getElementById('selectedCount').textContent = count + ' selected | ' + approved + ' approved | ' + rejected + ' rejected';
+}
+
+function copyAddr(addr) {
+    navigator.clipboard.writeText(addr).then(() => showToast('Copied: ' + addr));
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2000);
+}
+</script>
+</body>
+</html>
