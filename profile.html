@@ -732,7 +732,11 @@ function computeData(swaps, balances, days) {
     };
 }
 
-function drawPnlChart(timeline) {
+let pnlTimelineCache = [];
+let hoursCache = [];
+
+function drawPnlChart(timeline, highlightIdx) {
+    pnlTimelineCache = timeline;
     const canvas = document.getElementById('pnlChart');
     if (!canvas || !timeline.length) return;
     const dpr = window.devicePixelRatio || 1;
@@ -742,13 +746,12 @@ function drawPnlChart(timeline) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     const w = rect.width, h = rect.height;
-    const pad = { t: 4, b: 4, l: 2, r: 2 };
+    const pad = { t: 14, b: 4, l: 2, r: 2 };
 
     const values = timeline.map(p => p.pnl);
     const minV = Math.min(0, ...values);
     const maxV = Math.max(0, ...values);
     const range = maxV - minV || 1;
-
     const plotW = w - pad.l - pad.r;
     const plotH = h - pad.t - pad.b;
 
@@ -763,38 +766,86 @@ function drawPnlChart(timeline) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw line
+    // Points array for hover
+    const points = [];
     ctx.beginPath();
     for (let i = 0; i < timeline.length; i++) {
         const x = pad.l + (i / (timeline.length - 1 || 1)) * plotW;
         const y = pad.t + plotH * (1 - (timeline[i].pnl - minV) / range);
+        points.push({ x, y });
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     }
     const lastPnl = timeline[timeline.length - 1].pnl;
-    ctx.strokeStyle = lastPnl >= 0 ? '#22c55e' : '#ef4444';
+    const lineColor = lastPnl >= 0 ? '#22c55e' : '#ef4444';
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
     // Fill gradient
     const lastX = pad.l + plotW;
-    const lastY = pad.t + plotH * (1 - (lastPnl - minV) / range);
     ctx.lineTo(lastX, zeroY);
     ctx.lineTo(pad.l, zeroY);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     if (lastPnl >= 0) {
-        grad.addColorStop(0, 'rgba(34,197,94,0.25)');
+        grad.addColorStop(0, 'rgba(34,197,94,0.2)');
         grad.addColorStop(1, 'rgba(34,197,94,0)');
     } else {
         grad.addColorStop(0, 'rgba(239,68,68,0)');
-        grad.addColorStop(1, 'rgba(239,68,68,0.25)');
+        grad.addColorStop(1, 'rgba(239,68,68,0.2)');
     }
     ctx.fillStyle = grad;
     ctx.fill();
+
+    // Hover crosshair + tooltip
+    if (highlightIdx !== undefined && highlightIdx >= 0 && highlightIdx < points.length) {
+        const pt = points[highlightIdx];
+        const d = timeline[highlightIdx];
+        // Vertical line
+        ctx.strokeStyle = '#ffffff33';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pad.t);
+        ctx.lineTo(pt.x, h - pad.b);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Dot
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = lineColor;
+        ctx.fill();
+        ctx.strokeStyle = '#0a0a0f';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Tooltip
+        const sign = d.pnl >= 0 ? '+' : '';
+        const label = sign + d.pnl.toFixed(2) + ' SOL';
+        const date = new Date(d.ts);
+        const dateStr = date.toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+        ctx.font = '600 11px monospace';
+        const tw = Math.max(ctx.measureText(label).width, ctx.measureText(dateStr).width) + 12;
+        let tx = pt.x - tw / 2;
+        if (tx < 2) tx = 2;
+        if (tx + tw > w - 2) tx = w - 2 - tw;
+        ctx.fillStyle = '#1a1a2eee';
+        ctx.beginPath();
+        ctx.roundRect(tx, 0, tw, 26, 4);
+        ctx.fill();
+        ctx.fillStyle = d.pnl >= 0 ? '#22c55e' : '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, tx + tw / 2, 11);
+        ctx.fillStyle = '#666';
+        ctx.font = '9px monospace';
+        ctx.fillText(dateStr, tx + tw / 2, 22);
+    }
+
+    canvas._points = points;
 }
 
-function drawActivityChart(hours) {
+function drawActivityChart(hours, highlightIdx) {
+    hoursCache = hours;
     const canvas = document.getElementById('activityChart');
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
@@ -804,33 +855,89 @@ function drawActivityChart(hours) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     const w = rect.width, h = rect.height;
-    const pad = { t: 4, b: 4, l: 2, r: 2 };
+    const pad = { t: 14, b: 4, l: 2, r: 2 };
     const plotW = w - pad.l - pad.r;
     const plotH = h - pad.t - pad.b;
     const maxH = Math.max(...hours, 1);
     const barW = plotW / 24 - 2;
 
+    canvas._bars = [];
     for (let i = 0; i < 24; i++) {
-        const barH = (hours[i] / maxH) * plotH;
+        const barH = Math.max(2, (hours[i] / maxH) * plotH);
         const x = pad.l + (i / 24) * plotW + 1;
         const y = pad.t + plotH - barH;
+        const isHover = highlightIdx === i;
 
-        // Gradient bar
         const grad = ctx.createLinearGradient(0, y, 0, y + barH);
-        grad.addColorStop(0, '#7dd3fc');
-        grad.addColorStop(1, '#7dd3fc44');
+        if (isHover) {
+            grad.addColorStop(0, '#7dd3fc');
+            grad.addColorStop(1, '#7dd3fc88');
+        } else {
+            grad.addColorStop(0, '#7dd3fc88');
+            grad.addColorStop(1, '#7dd3fc22');
+        }
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.roundRect(x, y, Math.max(barW, 3), barH, [2, 2, 0, 0]);
         ctx.fill();
 
-        // Count label on top if significant
-        if (hours[i] > maxH * 0.3) {
-            ctx.fillStyle = '#888';
-            ctx.font = '9px monospace';
+        canvas._bars.push({ x, y, w: barW, h: barH, idx: i });
+
+        if (isHover) {
+            // Tooltip
+            const label = i + ':00 UTC';
+            const countStr = hours[i] + ' txs';
+            ctx.font = '600 11px monospace';
+            const tw = Math.max(ctx.measureText(label).width, ctx.measureText(countStr).width) + 12;
+            let tx = x + barW / 2 - tw / 2;
+            if (tx < 2) tx = 2;
+            if (tx + tw > w - 2) tx = w - 2 - tw;
+            ctx.fillStyle = '#1a1a2eee';
+            ctx.beginPath();
+            ctx.roundRect(tx, 0, tw, 26, 4);
+            ctx.fill();
+            ctx.fillStyle = '#7dd3fc';
             ctx.textAlign = 'center';
-            ctx.fillText(hours[i], x + barW / 2, y - 3);
+            ctx.fillText(countStr, tx + tw / 2, 11);
+            ctx.fillStyle = '#666';
+            ctx.font = '9px monospace';
+            ctx.fillText(label, tx + tw / 2, 22);
         }
+    }
+}
+
+// Hover handlers — attach after render
+function attachChartHovers() {
+    const pnlCanvas = document.getElementById('pnlChart');
+    const actCanvas = document.getElementById('activityChart');
+
+    if (pnlCanvas) {
+        pnlCanvas.addEventListener('mousemove', function(e) {
+            const rect = pnlCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            if (!pnlTimelineCache.length) return;
+            const plotW = rect.width - 4;
+            const idx = Math.round((mx - 2) / plotW * (pnlTimelineCache.length - 1));
+            const clamped = Math.max(0, Math.min(pnlTimelineCache.length - 1, idx));
+            drawPnlChart(pnlTimelineCache, clamped);
+        });
+        pnlCanvas.addEventListener('mouseleave', function() {
+            drawPnlChart(pnlTimelineCache);
+        });
+    }
+
+    if (actCanvas) {
+        actCanvas.addEventListener('mousemove', function(e) {
+            const rect = actCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const plotW = rect.width - 4;
+            const idx = Math.floor((mx - 2) / plotW * 24);
+            const clamped = Math.max(0, Math.min(23, idx));
+            drawActivityChart(hoursCache, clamped);
+        });
+        actCanvas.addEventListener('mouseleave', function() {
+            drawActivityChart(hoursCache);
+        });
     }
 }
 
@@ -865,7 +972,7 @@ function renderProfile(wallet, data) {
     document.getElementById('pnlPanel').innerHTML =
         '<div class="panel-title">PNL <span style="font-size:13px;font-weight:700;color:' + pnlColor + '">' +
             (data.totalPnl >= 0 ? '+' : '') + data.totalPnl.toFixed(2) + ' SOL</span></div>' +
-        '<canvas id="pnlChart" style="width:100%;height:110px;"></canvas>' +
+        '<canvas id="pnlChart" style="width:100%;height:110px;cursor:crosshair;"></canvas>' +
         '<div style="display:flex;justify-content:space-between;margin-top:6px;">' +
             '<div style="font-size:10px;"><span style="color:#555;">Realized </span><span style="color:' + (data.realizedPnl >= 0 ? '#22c55e' : '#ef4444') + '">' +
                 (data.realizedPnl >= 0 ? '+' : '') + data.realizedPnl.toFixed(2) + '</span></div>' +
@@ -877,10 +984,11 @@ function renderProfile(wallet, data) {
     // Activity chart panel
     document.getElementById('activityPanel').innerHTML =
         '<div class="panel-title">Activity <span style="font-size:11px;color:#666;">(UTC hours)</span></div>' +
-        '<canvas id="activityChart" style="width:100%;height:110px;"></canvas>' +
+        '<canvas id="activityChart" style="width:100%;height:110px;cursor:crosshair;"></canvas>' +
         '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:#555;">' +
             '<span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>';
     drawActivityChart(data.hours);
+    setTimeout(attachChartHovers, 50);
 
     // Performance panel
     const totalEntries = data.dist.gt500 + data.dist.gt200 + data.dist.gt0 + data.dist.gtNeg50 + data.dist.ltNeg50;
