@@ -506,6 +506,15 @@ async function fetchTxs(address, maxTx) {
 }
 
 // Parse all swaps from transactions
+const STABLECOINS = new Set([
+    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+    'USDhTjkUXFfigLELiFpbBQ2QURGBCF1h4VisgnqYAdR',  // USD1
+    '2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo', // PYUSD
+    'USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX',   // USDH
+    'USDSwr9ApdHk5bvJKMjzff41FfuX8bSxdKcR81vTwcA',   // USDS
+]);
+
 function parseSwaps(txs, wallet) {
     const swaps = [];
     const SOL = 'So11111111111111111111111111111111111111112';
@@ -524,7 +533,7 @@ function parseSwaps(txs, wallet) {
 
         const tokIn = [], tokOut = [];
         for (const t of transfers) {
-            if (t.mint === SOL) continue;
+            if (t.mint === SOL || STABLECOINS.has(t.mint)) continue;
             if (t.toUserAccount === wallet) tokIn.push({ mint: t.mint, amount: t.tokenAmount });
             if (t.fromUserAccount === wallet) tokOut.push({ mint: t.mint, amount: t.tokenAmount });
         }
