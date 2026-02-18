@@ -142,6 +142,28 @@ async function enhancedTxs(addr, limit, before) {
 let overlaps = {}; // tokenMint -> { name, wallets: Set, details: [{wallet, action, timestamp}] }
 let isRunning = false;
 
+// Load saved results
+try {
+    const saved = localStorage.getItem('overlap_results');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        for (const [mint, data] of Object.entries(parsed)) {
+            overlaps[mint] = { wallets: new Set(data.wallets), details: data.details, latestTimestamp: data.latestTimestamp };
+        }
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('resultsSection').style.display = 'block';
+        renderResults();
+    }
+} catch(e) {}
+
+function saveResults() {
+    const serializable = {};
+    for (const [mint, data] of Object.entries(overlaps)) {
+        serializable[mint] = { wallets: Array.from(data.wallets), details: data.details, latestTimestamp: data.latestTimestamp };
+    }
+    localStorage.setItem('overlap_results', JSON.stringify(serializable));
+}
+
 function setProgress(pct, text) {
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressText').textContent = text;
@@ -231,6 +253,7 @@ async function startScan() {
     setProgress(100, 'Done! Analyzing overlaps...');
     
     document.getElementById('resultsSection').style.display = 'block';
+    saveResults();
     renderResults();
     
     isRunning = false;

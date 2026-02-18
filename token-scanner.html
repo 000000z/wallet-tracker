@@ -209,6 +209,32 @@ let results = [];
 let currentSort = { key: 'buyTime', dir: 1 };
 let isRunning = false;
 
+// Load saved results
+try {
+    const saved = localStorage.getItem('tokenscan_results');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        results = parsed.results || [];
+        if (results.length) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('resultsTable').style.display = 'table';
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('actionsBar').style.display = 'flex';
+            document.getElementById('tokenInfo').style.display = 'block';
+            document.getElementById('tokenInfo').innerHTML = '<div class="row"><div><div class="label">LAST SCAN</div><div class="value" style="font-size:12px;">' + (parsed.token || 'Unknown') + '</div></div></div>';
+            const earlyCount = results.filter(r => r.tags.includes('EARLY')).length;
+            const trackedCount = results.filter(r => r.isTracked).length;
+            const whaleCount = results.filter(r => r.tags.includes('WHALE')).length;
+            document.getElementById('summaryBar').innerHTML =
+                '<div class="summary-stat"><div class="num">' + results.length + '</div><div class="label">Buyers found</div></div>' +
+                '<div class="summary-stat"><div class="num yellow">' + earlyCount + '</div><div class="label">Early buyers</div></div>' +
+                '<div class="summary-stat"><div class="num green">' + trackedCount + '</div><div class="label">Already tracked</div></div>' +
+                '<div class="summary-stat"><div class="num">' + whaleCount + '</div><div class="label">Whales (500+ SOL)</div></div>';
+            renderTable();
+        }
+    }
+} catch(e) {}
+
 function setProgress(pct, text) {
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressText').textContent = text;
@@ -453,6 +479,9 @@ async function startScan() {
             '<div class="summary-stat"><div class="num">' + whaleCount + '</div><div class="label">Whales (500+ SOL)</div></div>';
         
         renderTable();
+        
+        // Save results
+        localStorage.setItem('tokenscan_results', JSON.stringify({ token: tokenMint, results }));
         
     } catch(e) {
         log('Fatal error: ' + e.message);
