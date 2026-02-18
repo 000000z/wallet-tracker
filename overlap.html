@@ -299,7 +299,7 @@ function renderResults() {
         
         return '<div class="overlap-card">' +
             '<div class="token-header">' +
-                '<div><span class="token-name">' + shortMint + '</span> <span style="color:#666;font-size:11px;">Last activity: ' + timeStr + '</span></div>' +
+                '<div><a href="https://solscan.io/token/' + t.mint + '" target="_blank" class="token-name" style="color:#e0e0e0;text-decoration:none;">' + shortMint + '</a> <span style="cursor:pointer;color:#7dd3fc;font-size:11px;" onclick="copyAddr(\'' + t.mint + '\')">[copy CA]</span> <span style="color:#666;font-size:11px;">Last activity: ' + timeStr + '</span></div>' +
                 '<span class="buyer-count ' + countClass + '">' + t.buyerCount + ' wallets</span>' +
             '</div>' +
             '<div class="buyers-list">' + buyerTags + '</div>' +
@@ -310,6 +310,16 @@ function renderResults() {
             '</div>' +
         '</div>';
     }).join('');
+}
+
+function copyAddr(addr) {
+    navigator.clipboard.writeText(addr).then(() => {
+        const t = document.createElement('div');
+        t.textContent = 'Copied: ' + addr;
+        t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#22c55e;color:#000;padding:8px 16px;border-radius:6px;font-size:12px;z-index:1000;';
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2000);
+    });
 }
 </script>
 </body>
