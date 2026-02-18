@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token Scanner - Chillz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.header { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 18px; color: #7dd3fc; }
+.nav-links { display: flex; gap: 8px; }
+.nav-links a, .nav-links button { color: #666; text-decoration: none; font-size: 12px; padding: 4px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: none; cursor: pointer; font-family: inherit; }
+.nav-links a:hover, .nav-links button:hover { color: #7dd3fc; border-color: #7dd3fc33; }
+
+.search-section { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; }
+.search-row { display: flex; gap: 8px; align-items: center; }
+.search-input { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-family: inherit; flex: 1; }
+.search-input:focus { outline: none; border-color: #7dd3fc; }
+.search-input::placeholder { color: #444; }
+.btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; border: 1px solid; transition: all 0.15s; }
+.btn-primary { background: #7dd3fc22; border-color: #7dd3fc44; color: #7dd3fc; }
+.btn-primary:hover { background: #7dd3fc33; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-green { background: #22c55e22; border-color: #22c55e44; color: #22c55e; }
+.btn-green:hover { background: #22c55e33; }
+
+.options { display: flex; gap: 16px; margin-top: 10px; align-items: center; }
+.options label { color: #666; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.options input[type=number] { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; width: 60px; }
+
+.progress-section { padding: 16px 24px; display: none; }
+.progress-bar { background: #1a1a2e; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { background: #7dd3fc; height: 100%; width: 0%; transition: width 0.3s; }
+.progress-text { color: #666; font-size: 12px; }
+.progress-log { max-height: 100px; overflow-y: auto; margin-top: 8px; font-size: 11px; color: #555; }
+.progress-log div { padding: 1px 0; }
+.progress-log .ok { color: #22c55e; }
+.progress-log .early { color: #f59e0b; }
+.progress-log .skip { color: #666; }
+
+.token-info { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; display: none; }
+.token-info .row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.token-info .label { color: #666; font-size: 11px; }
+.token-info .value { color: #e0e0e0; font-size: 14px; font-weight: 600; }
+.token-info .value.green { color: #22c55e; }
+.token-info .links { display: flex; gap: 6px; margin-top: 8px; }
+.token-info .links a { font-size: 11px; padding: 3px 10px; border-radius: 4px; text-decoration: none; }
+.token-info .links .birdeye { background: #22c55e22; color: #22c55e; }
+.token-info .links .dex { background: #3b82f622; color: #3b82f6; }
+.token-info .links .solscan { background: #8b5cf622; color: #8b5cf6; }
+
+.results-section { padding: 16px 24px; display: none; }
+.results-section h2 { font-size: 15px; color: #7dd3fc; margin-bottom: 12px; }
+
+.summary-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.summary-stat { background: #1a1a2e; border: 1px solid #2a2a3e; padding: 8px 16px; border-radius: 8px; text-align: center; }
+.summary-stat .num { font-size: 20px; font-weight: 700; color: #7dd3fc; }
+.summary-stat .num.green { color: #22c55e; }
+.summary-stat .num.yellow { color: #f59e0b; }
+.summary-stat .label { font-size: 11px; color: #666; margin-top: 2px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #12121a; position: sticky; top: 0; z-index: 10; text-align: left; padding: 10px 8px; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #1e1e2e; cursor: pointer; user-select: none; }
+th:hover { color: #999; }
+th.sorted { color: #7dd3fc; }
+td { padding: 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
+tr:hover { background: #ffffff05; }
+
+.addr a { color: #7dd3fc; text-decoration: none; font-size: 12px; }
+.addr a:hover { text-decoration: underline; }
+.copy-btn { cursor: pointer; opacity: 0.3; font-size: 10px; }
+.copy-btn:hover { opacity: 1; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge.early { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b33; }
+.badge.tracked { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; }
+.badge.whale { background: #7dd3fc22; color: #7dd3fc; border: 1px solid #7dd3fc33; }
+.badge.bot { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; }
+
+.sol-bal { color: #f59e0b; font-weight: 600; }
+.sol-bal.zero { color: #444; font-weight: normal; }
+.time-ago { color: #666; font-size: 11px; }
+.time-ago.recent { color: #22c55e; }
+
+.links { display: flex; gap: 4px; }
+.links a { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; text-decoration: none; }
+.links .solscan { background: #3b82f622; color: #3b82f6; }
+.links .birdeye { background: #22c55e22; color: #22c55e; }
+
+.checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #22c55e; }
+.actions-bar { padding: 8px 24px; display: none; gap: 8px; align-items: center; background: #12121a; border-bottom: 1px solid #1e1e2e; }
+.selected-count { color: #666; font-size: 11px; margin-left: 8px; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: #000; padding: 8px 16px; border-radius: 6px; font-size: 12px; display: none; z-index: 1000; }
+.empty-state { text-align: center; padding: 80px 24px; color: #444; }
+.empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Token Scanner</h1>
+    <div class="nav-links">
+        <a href="index.html">Explorer</a>
+        <a href="discover.html">Discover</a>
+        <a href="overlap.html">Overlap</a>
+        <button onclick="localStorage.removeItem('helius_api_key');location.reload();">Change Key</button>
+    </div>
+</div>
+
+<div class="search-section">
+    <div class="search-row">
+        <input type="text" class="search-input" id="tokenInput" placeholder="Paste a token mint address...">
+        <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Scan Buyers</button>
+    </div>
+    <div class="options">
+        <label>Max buyers to scan: <input type="number" id="maxBuyers" value="100" min="20" max="500" step="20"></label>
+        <label>Classify txs: <input type="number" id="classifyTxs" value="100" min="30" max="200" step="30"></label>
+        <label>Delay (ms): <input type="number" id="delayMs" value="100" min="50" max="2000" step="50"></label>
+    </div>
+</div>
+
+<div class="token-info" id="tokenInfo"></div>
+
+<div class="progress-section" id="progressSection">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">Starting...</div>
+    <div class="progress-log" id="progressLog"></div>
+</div>
+
+<div class="results-section" id="resultsSection">
+    <div class="summary-bar" id="summaryBar"></div>
+    <h2>Early Buyers & Smart Wallets</h2>
+</div>
+
+<div class="actions-bar" id="actionsBar">
+    <button class="btn btn-green" onclick="exportSelected()">Export selected</button>
+    <span class="selected-count" id="selectedCount">0 selected</span>
+</div>
+
+<div class="table-wrap" style="padding:0 24px 24px;">
+    <table id="resultsTable" style="display:none">
+        <thead>
+        <tr>
+            <th style="width:30px"><input type="checkbox" class="checkbox" onclick="toggleAll(this)"></th>
+            <th data-sort="buyTime">Buy Time</th>
+            <th data-sort="address">Wallet</th>
+            <th data-sort="solBalance" style="width:80px">SOL Bal</th>
+            <th data-sort="swapCount" style="width:70px">Swaps</th>
+            <th data-sort="totalSigs" style="width:70px">Total Txs</th>
+            <th>Tags</th>
+            <th style="width:140px">Links</th>
+        </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+</div>
+
+<div class="empty-state" id="emptyState">
+    <h2>Paste a token mint address above</h2>
+    <p>Finds all early buyers, classifies them as human/bot/whale, and helps you discover new smart wallets.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function getApiKey() {
+    let key = localStorage.getItem('helius_api_key');
+    if (!key) {
+        key = prompt('Enter your Helius API key:');
+        if (key) localStorage.setItem('helius_api_key', key);
+    }
+    return key;
+}
+let API_KEY = getApiKey();
+const RPC_BASE = 'https://mainnet.helius-rpc.com/?api-key=';
+const ENHANCED = 'https://api-mainnet.helius-rpc.com/v0/addresses';
+
+// Load tracked wallets from localStorage or empty
+let trackedAddrs = new Set();
+try {
+    const saved = localStorage.getItem('tracked_wallets');
+    if (saved) trackedAddrs = new Set(JSON.parse(saved));
+} catch(e) {}
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function rpcCall(method, params) {
+    const resp = await fetch(RPC_BASE + API_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+    });
+    return resp.json();
+}
+
+async function enhancedTxs(addr, limit, before) {
+    let url = ENHANCED + '/' + addr + '/transactions?api-key=' + API_KEY + '&limit=' + limit;
+    if (before) url += '&before=' + before;
+    const resp = await fetch(url);
+    return resp.json();
+}
+
+let results = [];
+let currentSort = { key: 'buyTime', dir: 1 };
+let isRunning = false;
+
+function setProgress(pct, text) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = text;
+}
+
+function log(text, cls) {
+    const el = document.getElementById('progressLog');
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = text;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+}
+
+function shortAddr(a) { return a.slice(0, 6) + '...' + a.slice(-4); }
+
+function timeAgo(ts) {
+    if (!ts) return 'Unknown';
+    const diff = Math.floor(Date.now() / 1000) - ts;
+    if (diff < 60) return diff + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}
+
+async function startScan() {
+    if (isRunning) return;
+    const tokenMint = document.getElementById('tokenInput').value.trim();
+    if (!tokenMint || tokenMint.length < 32) return alert('Enter a valid token mint address');
+    
+    isRunning = true;
+    results = [];
+    document.getElementById('scanBtn').disabled = true;
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('progressLog').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultsTable').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('actionsBar').style.display = 'none';
+    
+    const maxBuyers = parseInt(document.getElementById('maxBuyers').value) || 100;
+    const classifyLimit = parseInt(document.getElementById('classifyTxs').value) || 100;
+    const delayMs = parseInt(document.getElementById('delayMs').value) || 100;
+    
+    // Show token info
+    document.getElementById('tokenInfo').style.display = 'block';
+    document.getElementById('tokenInfo').innerHTML = 
+        '<div class="row"><div><div class="label">TOKEN MINT</div><div class="value" style="font-size:12px;">' + tokenMint + '</div></div></div>' +
+        '<div class="links"><a href="https://birdeye.so/token/' + tokenMint + '?chain=solana" target="_blank" class="birdeye">Birdeye</a> ' +
+        '<a href="https://dexscreener.com/solana/' + tokenMint + '" target="_blank" class="dex">DexScreener</a> ' +
+        '<a href="https://solscan.io/token/' + tokenMint + '" target="_blank" class="solscan">Solscan</a></div>';
+    
+    try {
+        // Step 1: Get early transactions for this token using signatures
+        setProgress(5, 'Fetching token transactions...');
+        log('Fetching transactions for token...');
+        
+        // Use getSignaturesForAddress on the token mint to find early txs
+        let allSigs = [];
+        let beforeSig = null;
+        // Fetch backwards to get earliest txs
+        while (allSigs.length < 1000) {
+            const sigResp = await rpcCall('getSignaturesForAddress', [tokenMint, { limit: 1000, before: beforeSig || undefined }]);
+            await sleep(delayMs);
+            if (!sigResp.result || !sigResp.result.length) break;
+            allSigs = allSigs.concat(sigResp.result);
+            if (sigResp.result.length < 1000) break;
+            beforeSig = sigResp.result[sigResp.result.length - 1].signature;
+        }
+        
+        log('Found ' + allSigs.length + ' total token transactions');
+        
+        // Sort by blockTime ascending (earliest first)
+        allSigs.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
+        
+        // Step 2: Use enhanced API on token mint to find buyers
+        setProgress(15, 'Parsing transactions to find buyers...');
+        
+        let buyerMap = {}; // wallet -> { firstBuyTime, txCount }
+        let parsedTxs = [];
+        let bSig = null;
+        
+        // Parse from enhanced API — get the token's transactions
+        // We'll fetch the earliest signers by going through sigs chronologically
+        // Use enhanced API on each unique signer to find who swapped this token
+        
+        // Actually, let's use a smarter approach: parse the signatures to find unique accounts
+        // Then check each one via enhanced API
+        
+        // Get unique accounts from earliest signatures
+        setProgress(20, 'Identifying early buyers...');
+        
+        // Process earliest sigs first — fetch their details
+        const earliestSigs = allSigs.slice(0, Math.min(200, allSigs.length));
+        const uniqueAccounts = {};
+        
+        for (let i = 0; i < earliestSigs.length; i += 20) {
+            const batch = earliestSigs.slice(i, i + 20).map(s => s.signature);
+            // Use getTransaction for each to find signers
+            for (const sig of batch) {
+                try {
+                    const txResp = await rpcCall('getTransaction', [sig, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]);
+                    await sleep(delayMs / 2);
+                    if (!txResp.result) continue;
+                    
+                    const accounts = txResp.result.transaction.message.accountKeys || [];
+                    const blockTime = txResp.result.blockTime || 0;
+                    
+                    // The first signer is typically the buyer
+                    for (const acc of accounts) {
+                        const addr = acc.pubkey || acc;
+                        if (typeof addr !== 'string' || addr.length < 32) continue;
+                        if (addr === tokenMint) continue;
+                        if (addr === '11111111111111111111111111111111') continue;
+                        if (addr === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') continue;
+                        if (addr === 'ComputeBudget111111111111111111111111111111') continue;
+                        if (addr === 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL') continue;
+                        
+                        const isSigner = acc.signer === true;
+                        if (isSigner && !uniqueAccounts[addr]) {
+                            uniqueAccounts[addr] = { firstSeen: blockTime, sig };
+                        }
+                    }
+                } catch(e) { continue; }
+            }
+            
+            const pct = 20 + Math.floor((i / earliestSigs.length) * 30);
+            setProgress(pct, 'Parsing tx ' + Math.min(i + 20, earliestSigs.length) + '/' + earliestSigs.length);
+            
+            if (Object.keys(uniqueAccounts).length >= maxBuyers) break;
+        }
+        
+        // Sort by first seen time
+        let buyers = Object.entries(uniqueAccounts)
+            .map(([addr, info]) => ({ address: addr, buyTime: info.firstSeen }))
+            .sort((a, b) => a.buyTime - b.buyTime)
+            .slice(0, maxBuyers);
+        
+        log('Found ' + buyers.length + ' unique early signers');
+        setProgress(55, 'Classifying ' + buyers.length + ' wallets...');
+        
+        // Step 3: Classify each buyer
+        for (let i = 0; i < buyers.length; i++) {
+            const buyer = buyers[i];
+            const short = shortAddr(buyer.address);
+            const pct = 55 + Math.floor((i / buyers.length) * 40);
+            setProgress(pct, 'Classifying ' + (i + 1) + '/' + buyers.length + ' - ' + short);
+            
+            try {
+                // Get account info
+                const acctResp = await rpcCall('getAccountInfo', [buyer.address, { encoding: 'jsonParsed' }]);
+                await sleep(delayMs);
+                
+                const acctData = acctResp.result && acctResp.result.value;
+                
+                // Skip programs and mints
+                if (acctData && acctData.executable) { log(short + ' -> program (skip)', 'skip'); continue; }
+                if (acctData && acctData.data && acctData.data.program === 'spl-token') { log(short + ' -> token account (skip)', 'skip'); continue; }
+                
+                const solBalance = acctData ? (acctData.lamports || 0) / 1e9 : 0;
+                
+                // Get enhanced txs for classification
+                let txs = [];
+                let bSig2 = null;
+                let pages = Math.ceil(classifyLimit / 20);
+                while (pages > 0 && txs.length < classifyLimit) {
+                    const page = await enhancedTxs(buyer.address, 20, bSig2);
+                    await sleep(delayMs);
+                    if (!page || !page.length) break;
+                    txs = txs.concat(page);
+                    if (page.length < 20) break;
+                    bSig2 = page[page.length - 1].signature;
+                    pages--;
+                }
+                
+                if (txs.length === 0) { log(short + ' -> no txs (skip)', 'skip'); continue; }
+                
+                let swapCount = 0, isFeePayer = 0;
+                const interactors = {};
+                for (const tx of txs) {
+                    if (/SWAP/.test(tx.type || '')) swapCount++;
+                    if (tx.feePayer === buyer.address) isFeePayer++;
+                    if (tx.feePayer && tx.feePayer !== buyer.address) interactors[tx.feePayer] = true;
+                }
+                const uniqueCount = Object.keys(interactors).length;
+                const txCount = txs.length;
+                
+                // Get total sigs
+                const sigResp2 = await rpcCall('getSignaturesForAddress', [buyer.address, { limit: 1000 }]);
+                await sleep(delayMs);
+                const totalSigs = sigResp2.result ? sigResp2.result.length : 0;
+                
+                // Tags
+                const tags = [];
+                const isTracked = trackedAddrs.has(buyer.address);
+                if (isTracked) tags.push('TRACKED');
+                
+                if (uniqueCount > 15 && isFeePayer === 0) { log(short + ' -> CEX/protocol (skip)', 'skip'); continue; }
+                if (totalSigs >= 1000 && isFeePayer === 0) { log(short + ' -> CEX (skip)', 'skip'); continue; }
+                
+                // Is it early?
+                const tokenFirstSeen = allSigs[0] ? allSigs[0].blockTime : 0;
+                if (tokenFirstSeen && buyer.buyTime && (buyer.buyTime - tokenFirstSeen) < 300) tags.push('EARLY');
+                if (solBalance > 500) tags.push('WHALE');
+                if (swapCount > 0 && isFeePayer > 0) tags.push('TRADER');
+                else if (swapCount > 0 && isFeePayer === 0) tags.push('PLATFORM');
+                
+                const cls = tags.includes('EARLY') ? 'early' : 'ok';
+                log(short + ' -> ' + tags.join(', ') + ' (' + swapCount + ' swaps, ' + solBalance.toFixed(1) + ' SOL)', cls);
+                
+                results.push({
+                    address: buyer.address,
+                    buyTime: buyer.buyTime,
+                    solBalance: Math.round(solBalance * 100) / 100,
+                    swapCount,
+                    totalSigs,
+                    isFeePayer,
+                    tags,
+                    isTracked
+                });
+                
+            } catch(e) {
+                log(short + ' -> error: ' + e.message, 'skip');
+            }
+        }
+        
+        setProgress(100, 'Done! Found ' + results.length + ' wallet buyers');
+        
+        // Show results
+        document.getElementById('resultsSection').style.display = 'block';
+        document.getElementById('resultsTable').style.display = 'table';
+        document.getElementById('actionsBar').style.display = 'flex';
+        
+        const earlyCount = results.filter(r => r.tags.includes('EARLY')).length;
+        const trackedCount = results.filter(r => r.isTracked).length;
+        const whaleCount = results.filter(r => r.tags.includes('WHALE')).length;
+        
+        document.getElementById('summaryBar').innerHTML =
+            '<div class="summary-stat"><div class="num">' + results.length + '</div><div class="label">Buyers found</div></div>' +
+            '<div class="summary-stat"><div class="num yellow">' + earlyCount + '</div><div class="label">Early buyers</div></div>' +
+            '<div class="summary-stat"><div class="num green">' + trackedCount + '</div><div class="label">Already tracked</div></div>' +
+            '<div class="summary-stat"><div class="num">' + whaleCount + '</div><div class="label">Whales (500+ SOL)</div></div>';
+        
+        renderTable();
+        
+    } catch(e) {
+        log('Fatal error: ' + e.message);
+        setProgress(0, 'Error: ' + e.message);
+    }
+    
+    isRunning = false;
+    document.getElementById('scanBtn').disabled = false;
+}
+
+function renderTable() {
+    results.sort((a, b) => {
+        let av = a[currentSort.key] || 0, bv = b[currentSort.key] || 0;
+        if (typeof av === 'number') return (av - bv) * currentSort.dir;
+        return String(av).localeCompare(String(bv)) * currentSort.dir;
+    });
+    
+    document.getElementById('tbody').innerHTML = results.map(w => {
+        const tagsHtml = w.tags.map(t => {
+            const cls = t === 'EARLY' ? 'early' : t === 'TRACKED' ? 'tracked' : t === 'WHALE' ? 'whale' : 'tracked';
+            return '<span class="badge ' + cls + '">' + t + '</span> ';
+        }).join('');
+        
+        const buyTimeStr = w.buyTime ? new Date(w.buyTime * 1000).toLocaleString() : 'Unknown';
+        const ago = timeAgo(w.buyTime);
+        
+        return '<tr>' +
+            '<td><input type="checkbox" class="checkbox" data-addr="' + w.address + '" onchange="updateCount()"></td>' +
+            '<td><div style="font-size:12px;">' + buyTimeStr + '</div><div class="time-ago">' + ago + '</div></td>' +
+            '<td class="addr"><a href="https://solscan.io/account/' + w.address + '" target="_blank" title="' + w.address + '">' + shortAddr(w.address) + '</a> <span class="copy-btn" onclick="copyAddr(\'' + w.address + '\')">[c]</span></td>' +
+            '<td class="sol-bal' + ((w.solBalance || 0) > 0 ? '' : ' zero') + '">' + (w.solBalance || 0).toFixed(2) + '</td>' +
+            '<td>' + (w.swapCount || 0) + '</td>' +
+            '<td>' + (w.totalSigs || 0) + '</td>' +
+            '<td>' + tagsHtml + '</td>' +
+            '<td class="links"><a href="https://solscan.io/account/' + w.address + '" target="_blank" class="solscan">Solscan</a> <a href="https://birdeye.so/profile/' + w.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a></td>' +
+            '</tr>';
+    }).join('');
+}
+
+document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (currentSort.key === key) currentSort.dir *= -1;
+        else { currentSort.key = key; currentSort.dir = 1; }
+        document.querySelectorAll('th').forEach(t => t.classList.remove('sorted'));
+        th.classList.add('sorted');
+        renderTable();
+    });
+});
+
+function toggleAll(el) { document.querySelectorAll('#tbody .checkbox').forEach(cb => { cb.checked = el.checked; }); updateCount(); }
+function updateCount() { document.getElementById('selectedCount').textContent = document.querySelectorAll('#tbody .checkbox:checked').length + ' selected'; }
+
+function exportSelected() {
+    const selected = [];
+    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => {
+        const addr = cb.dataset.addr;
+        const w = results.find(r => r.address === addr);
+        if (w) selected.push(w);
+    });
+    if (!selected.length) return showToast('Nothing selected');
+    const json = JSON.stringify(selected, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'token_buyers.json'; a.click();
+    showToast(selected.length + ' wallets exported');
+}
+
+function copyAddr(addr) { navigator.clipboard.writeText(addr).then(() => showToast('Copied: ' + addr)); }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+</script>
+</body>
+</html>
