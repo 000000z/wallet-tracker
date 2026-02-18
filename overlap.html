@@ -1,4 +1,4 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -66,7 +66,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
 .min-filter label { color: #666; font-size: 12px; }
 .min-filter select { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; }
 </style>
-<link rel="stylesheet" href="shared.css">\n</head>
+<link rel="stylesheet" href="shared.css"></head>
 <body>
 
 <div class="header">
@@ -173,7 +173,7 @@ async function startScan() {
     if (isRunning) return;
     
     const input = document.getElementById('walletsInput').value.trim();
-    const wallets = input.split('\n').map(l => l.trim()).filter(l => l.length >= 32);
+    const wallets = input.split('').map(l => l.trim()).filter(l => l.length >= 32);
     if (wallets.length < 2) return alert('Need at least 2 wallet addresses');
     
     isRunning = true;
@@ -302,7 +302,7 @@ function renderResults() {
         const countClass = t.buyerCount >= 4 ? 'hot' : t.buyerCount >= 3 ? 'warm' : 'mild';
         const shortMint = t.mint.slice(0, 6) + '...' + t.mint.slice(-4);
         
-        // Group details by wallet â€” get EARLIEST buy and latest action
+        // Group details by wallet — get EARLIEST buy and latest action
         const walletActions = {};
         const walletFirstBuy = {};
         for (const d of t.details) {
@@ -372,7 +372,7 @@ function renderResults() {
                 '</div>';
             }).join('');
             timingHtml = '<div id="' + cardId + '" style="display:none;margin-top:10px;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:6px;padding:10px;">' +
-                '<div style="font-size:11px;color:#666;margin-bottom:6px;">Buy timing (earliest first) â€” <span style="color:#ef4444;">red = within 15s</span></div>' +
+                '<div style="font-size:11px;color:#666;margin-bottom:6px;">Buy timing (earliest first) — <span style="color:#ef4444;">red = within 15s</span></div>' +
                 rows +
             '</div>';
         }
@@ -413,5 +413,5 @@ function copyAddr(addr) {
     });
 }
 </script>
-<script src="shared.js"></script>\n</body>
+<script src="shared.js"></script></body>
 </html>
