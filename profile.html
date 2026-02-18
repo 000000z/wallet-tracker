@@ -8,8 +8,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
 
+/* Search */
 .search-bar {
-    padding: 20px 24px;
+    padding: 16px 24px;
     display: flex;
     gap: 10px;
     align-items: center;
@@ -38,212 +39,35 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
     font-weight: 600;
 }
 .search-bar button:hover { background: #7dd3fc33; }
-.search-bar select {
-    background: #12121a;
-    border: 1px solid #2a2a3e;
-    color: #e0e0e0;
-    padding: 10px;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 12px;
-}
 
-.progress-wrap {
-    padding: 12px 24px;
-    display: none;
-}
-.progress-bar {
-    height: 4px;
-    background: #1e1e2e;
-    border-radius: 2px;
-    overflow: hidden;
-}
-.progress-fill {
-    height: 100%;
-    background: #7dd3fc;
-    border-radius: 2px;
-    transition: width 0.3s;
-    width: 0%;
-}
-.progress-text {
-    font-size: 11px;
-    color: #555;
-    margin-top: 4px;
-}
+/* Progress */
+.progress-wrap { padding: 12px 24px; display: none; }
+.progress-bar { height: 4px; background: #1e1e2e; border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: #7dd3fc; border-radius: 2px; transition: width 0.3s; width: 0%; }
+.progress-text { font-size: 11px; color: #555; margin-top: 4px; }
 
-#profileContent { display: none; }
-
-/* Summary cards */
-.summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    padding: 20px 24px;
-}
-.card {
-    background: #12121a;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 14px 16px;
-}
-.card-label {
-    font-size: 10px;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}
-.card-value {
-    font-size: 20px;
-    font-weight: 700;
-}
-.card-sub {
-    font-size: 11px;
-    color: #555;
-    margin-top: 4px;
-}
-.green { color: #22c55e; }
-.red { color: #ef4444; }
-.blue { color: #7dd3fc; }
-.yellow { color: #f59e0b; }
-.gray { color: #666; }
-
-/* Sections */
-.section {
-    padding: 16px 24px;
-}
-.section-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #7dd3fc;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #1e1e2e;
-}
-
-/* Trade table */
-.trades-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.trades-table th {
-    text-align: left;
-    padding: 8px;
-    color: #555;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid #1e1e2e;
-}
-.trades-table td {
-    padding: 8px;
-    border-bottom: 1px solid #0f0f18;
-    font-size: 12px;
-}
-.trades-table tr:hover { background: #ffffff05; }
-
-.token-link {
-    color: #7dd3fc;
-    text-decoration: none;
-}
-.token-link:hover { text-decoration: underline; }
-
-.links { display: flex; gap: 4px; }
-.links a {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    text-decoration: none;
-}
-.links .solscan { background: #3b82f622; color: #3b82f6; }
-.links .birdeye { background: #22c55e22; color: #22c55e; }
-
-/* Hours chart */
-.hours-chart {
+/* Wallet header */
+.wallet-header {
+    padding: 16px 24px 8px;
     display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 80px;
-    padding: 0 4px;
-}
-.hour-bar {
-    flex: 1;
-    background: #7dd3fc44;
-    border-radius: 2px 2px 0 0;
-    min-height: 2px;
-    position: relative;
-}
-.hour-bar:hover { background: #7dd3fc88; }
-.hour-bar .tip {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1a1a2e;
-    border: 1px solid #2a2a3e;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    white-space: nowrap;
-    color: #ccc;
-}
-.hour-bar:hover .tip { display: block; }
-.hours-labels {
-    display: flex;
-    gap: 3px;
-    padding: 4px 4px 0;
-}
-.hours-labels span {
-    flex: 1;
-    text-align: center;
-    font-size: 8px;
-    color: #444;
-}
-
-/* Top tokens */
-.token-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 10px;
-}
-.token-card {
-    background: #12121a;
-    border: 1px solid #1e1e2e;
-    border-radius: 8px;
-    padding: 12px;
-    display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
 }
-.token-card .name {
-    font-weight: 600;
-    font-size: 13px;
-    margin-bottom: 2px;
-}
-.token-card .meta {
-    font-size: 11px;
-    color: #555;
-}
-.token-card .pnl {
+.wallet-name {
     font-size: 16px;
     font-weight: 700;
-    text-align: right;
+    color: #e0e0e0;
 }
-.token-card .pnl-sub {
-    font-size: 10px;
+.wallet-addr {
+    font-size: 12px;
     color: #555;
-    text-align: right;
+    cursor: pointer;
 }
-
-.badge-win { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.badge-loss { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-
+.wallet-addr:hover { color: #888; }
 .wallet-links {
-    padding: 0 24px 8px;
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    margin-left: auto;
 }
 .wallet-links a {
     padding: 4px 10px;
@@ -251,6 +75,252 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
     font-size: 11px;
     text-decoration: none;
 }
+.wl-solscan { background: #3b82f622; color: #3b82f6; }
+.wl-birdeye { background: #22c55e22; color: #22c55e; }
+.wl-gmgn { background: #f59e0b22; color: #f59e0b; }
+
+/* Time selector */
+.time-selector {
+    padding: 8px 24px;
+    display: flex;
+    gap: 4px;
+}
+.time-btn {
+    background: none;
+    border: 1px solid #2a2a3e;
+    color: #666;
+    padding: 4px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+}
+.time-btn:hover { color: #ccc; border-color: #444; }
+.time-btn.active { color: #7dd3fc; border-color: #7dd3fc; background: #7dd3fc11; }
+
+/* Top panels */
+.panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 12px 24px;
+}
+.panel {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 16px;
+}
+.panel-title {
+    font-size: 11px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.panel-big {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.panel-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 12px;
+}
+.panel-label { color: #555; }
+.panel-value { font-weight: 600; }
+
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+.blue { color: #7dd3fc; }
+.yellow { color: #f59e0b; }
+.cyan { color: #06b6d4; }
+
+/* PnL distribution */
+.pnl-dist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+.dist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+.dist-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dist-label { flex: 1; color: #888; }
+.dist-count { color: #ccc; font-weight: 600; min-width: 30px; text-align: right; }
+
+.dist-bar-wrap {
+    height: 6px;
+    background: #1e1e2e;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    margin-top: 8px;
+}
+.dist-bar-seg {
+    height: 100%;
+    transition: width 0.3s;
+}
+
+/* Tabs */
+.tabs {
+    padding: 12px 24px 0;
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #1e1e2e;
+}
+.tab {
+    padding: 10px 20px;
+    color: #555;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+.tab:hover { color: #ccc; }
+.tab.active { color: #7dd3fc; border-bottom-color: #7dd3fc; }
+
+/* Position controls */
+.pos-controls {
+    padding: 10px 24px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.pos-search {
+    background: #12121a;
+    border: 1px solid #2a2a3e;
+    color: #e0e0e0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    width: 220px;
+}
+.pos-search:focus { outline: none; border-color: #7dd3fc; }
+.pos-toggle {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 11px;
+    color: #555;
+}
+.pos-toggle select {
+    background: #12121a;
+    border: 1px solid #2a2a3e;
+    color: #e0e0e0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+/* Table */
+.pos-table {
+    width: 100%;
+    border-collapse: collapse;
+    padding: 0 24px;
+}
+.pos-table th {
+    text-align: left;
+    padding: 10px 12px;
+    color: #555;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #1e1e2e;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.pos-table th:hover { color: #888; }
+.pos-table th.sorted { color: #7dd3fc; }
+.pos-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #0f0f18;
+    font-size: 12px;
+    vertical-align: middle;
+}
+.pos-table tr:hover { background: #ffffff05; }
+
+.token-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.token-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #7dd3fc;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.token-icon img { width: 100%; height: 100%; object-fit: cover; }
+.token-name {
+    font-weight: 600;
+    font-size: 13px;
+}
+.token-name a { color: #e0e0e0; text-decoration: none; }
+.token-name a:hover { color: #7dd3fc; }
+.token-desc {
+    font-size: 10px;
+    color: #555;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.token-buys-badge {
+    display: inline-block;
+    background: #22c55e22;
+    color: #22c55e;
+    border: 1px solid #22c55e33;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+.cell-sol { color: #f59e0b; font-weight: 500; }
+.cell-token { font-size: 10px; color: #555; }
+.cell-pnl { font-weight: 700; font-size: 13px; }
+.cell-pnl-pct { font-size: 11px; }
+
+.action-link {
+    color: #555;
+    text-decoration: none;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+.action-link:hover { color: #7dd3fc; background: #7dd3fc11; }
 
 .empty-state {
     text-align: center;
@@ -258,6 +328,12 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
     color: #444;
 }
 .empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #555; }
+
+#profileContent { display: none; }
+
+.table-wrap { padding: 0 24px 24px; overflow-x: auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 </style>
 <link rel="stylesheet" href="shared.css">
 </head>
@@ -265,11 +341,6 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
 
 <div class="search-bar">
     <input type="text" id="walletInput" placeholder="Paste wallet address..." spellcheck="false">
-    <select id="txCount">
-        <option value="200">200 txs</option>
-        <option value="500" selected>500 txs</option>
-        <option value="1000">1000 txs</option>
-    </select>
     <button onclick="analyze()">Analyze</button>
 </div>
 
@@ -279,268 +350,258 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
 </div>
 
 <div id="profileContent">
-    <div class="wallet-links" id="walletLinks"></div>
-    <div class="summary" id="summaryCards"></div>
+    <div class="wallet-header" id="walletHeader"></div>
 
-    <div class="section">
-        <div class="section-title">Active Hours (UTC)</div>
-        <div class="hours-chart" id="hoursChart"></div>
-        <div class="hours-labels" id="hoursLabels"></div>
+    <div class="time-selector" id="timeSelector">
+        <button class="time-btn" data-days="1">1d</button>
+        <button class="time-btn" data-days="7">7d</button>
+        <button class="time-btn active" data-days="30">30d</button>
+        <button class="time-btn" data-days="9999">Max</button>
     </div>
 
-    <div class="section">
-        <div class="section-title">Top Tokens by PnL</div>
-        <div class="token-grid" id="topTokens"></div>
+    <div class="panels">
+        <div class="panel" id="balancePanel"></div>
+        <div class="panel" id="pnlPanel"></div>
+        <div class="panel" id="perfPanel"></div>
     </div>
 
-    <div class="section">
-        <div class="section-title">Recent Trades</div>
-        <table class="trades-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Token</th>
-                    <th>Amount SOL</th>
-                    <th>PnL</th>
-                    <th>Hold Time</th>
-                    <th>Links</th>
-                </tr>
-            </thead>
-            <tbody id="tradesBody"></tbody>
-        </table>
+    <div class="tabs">
+        <button class="tab active" data-tab="positions">Active Positions</button>
+        <button class="tab" data-tab="history">History</button>
+        <button class="tab" data-tab="activity">Activity</button>
+    </div>
+
+    <div class="tab-content active" id="tab-positions">
+        <div class="pos-controls">
+            <input type="text" class="pos-search" id="posSearch" placeholder="Search by name or address">
+            <div class="pos-toggle">
+                Show in <select id="showUnit"><option value="SOL">SOL</option><option value="USD">USD</option></select>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="pos-table">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Token</th>
+                        <th data-sort="bought">Bought</th>
+                        <th data-sort="sold">Sold</th>
+                        <th data-sort="remaining">Remaining</th>
+                        <th data-sort="pnl" class="sorted">PNL% &#x2193;</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="posBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="tab-content" id="tab-history">
+        <div class="pos-controls">
+            <input type="text" class="pos-search" id="histSearch" placeholder="Search by name or address">
+        </div>
+        <div class="table-wrap">
+            <table class="pos-table">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Bought</th>
+                        <th>Sold</th>
+                        <th>PNL</th>
+                        <th>PNL%</th>
+                        <th>Hold Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="histBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="tab-content" id="tab-activity">
+        <div class="section" style="padding:16px 24px;">
+            <div style="font-size:14px;font-weight:700;color:#7dd3fc;margin-bottom:12px;">Active Hours (UTC)</div>
+            <div class="hours-chart" id="hoursChart" style="display:flex;align-items:flex-end;gap:3px;height:80px;"></div>
+            <div id="hoursLabels" style="display:flex;gap:3px;padding-top:4px;"></div>
+        </div>
     </div>
 </div>
 
 <div class="empty-state" id="emptyState">
     <h2>Wallet Profile</h2>
-    <p>Paste a wallet address to analyze trading history, win rate, PnL, and more.</p>
+    <p>Paste a wallet address to see full trading profile, PnL, active positions, and history.</p>
 </div>
 
 <script src="shared.js"></script>
 <script>
 const API_BASE = 'https://api-mainnet.helius-rpc.com/v0';
-const RPC = 'https://mainnet.helius-rpc.com/?api-key=';
-let apiKey = '';
+const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=';
+const DEXSCREENER = 'https://api.dexscreener.com/latest/dex/tokens/';
 
-// Known token names cache
-const tokenNames = {};
-const TOKEN_LIST_API = 'https://api.dexscreener.com/latest/dex/tokens/';
+let apiKey = '';
+let allSwaps = [];
+let tokenMeta = {}; // { mint: { symbol, name, logo, price, decimals } }
+let currentWallet = '';
+let currentDays = 30;
+let solPrice = 0;
+let currentSort = { key: 'pnl', dir: -1 };
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 function setProgress(pct, text) {
     document.getElementById('progressWrap').style.display = 'block';
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressText').textContent = text;
 }
-
-function hideProgress() {
-    document.getElementById('progressWrap').style.display = 'none';
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+function shortAddr(a) { return a.slice(0, 6) + '...' + a.slice(-4); }
+function formatNum(n) {
+    if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(n < 10 ? 3 : 1);
 }
-
-async function fetchTxs(address, limit) {
-    const all = [];
-    let before = undefined;
-    const batchSize = 100;
-    while (all.length < limit) {
-        let url = API_BASE + '/addresses/' + address + '/transactions?api-key=' + apiKey + '&limit=' + batchSize;
-        if (before) url += '&before=' + before;
-        setProgress(Math.min(95, (all.length / limit) * 100), 'Fetching transactions... ' + all.length + '/' + limit);
-        const resp = await fetch(url);
-        if (!resp.ok) {
-            if (resp.status === 429) { await sleep(2000); continue; }
-            break;
-        }
-        const data = await resp.json();
-        if (!data.length) break;
-        all.push(...data);
-        before = data[data.length - 1].signature;
-        if (data.length < batchSize) break;
-        await sleep(150);
-    }
-    return all.slice(0, limit);
+function formatUSD(n) {
+    if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(1) + 'K';
+    return '$' + n.toFixed(0);
 }
-
-function parseSwaps(txs, wallet) {
-    const swaps = [];
-    const walletLower = wallet.toLowerCase();
-
-    for (const tx of txs) {
-        if (tx.transactionError) continue;
-        const ts = tx.timestamp * 1000;
-        const sig = tx.signature;
-
-        // Check tokenTransfers for swaps
-        const transfers = tx.tokenTransfers || [];
-        const nativeTransfers = tx.nativeTransfers || [];
-
-        // Find SOL in/out for this wallet
-        let solIn = 0, solOut = 0;
-        for (const nt of nativeTransfers) {
-            if (nt.toUserAccount === wallet) solIn += nt.amount / 1e9;
-            if (nt.fromUserAccount === wallet) solOut += nt.amount / 1e9;
-        }
-
-        // Find token in/out
-        const tokenIn = [];
-        const tokenOut = [];
-        for (const tt of transfers) {
-            if (tt.toUserAccount === wallet) {
-                tokenIn.push({ mint: tt.mint, amount: tt.tokenAmount, decimals: tt.decimals || 0 });
-            }
-            if (tt.fromUserAccount === wallet) {
-                tokenOut.push({ mint: tt.mint, amount: tt.tokenAmount, decimals: tt.decimals || 0 });
-            }
-        }
-
-        // SOL native mint
-        const SOL_MINT = 'So11111111111111111111111111111111111111112';
-
-        // BUY: SOL goes out, token comes in
-        if (solOut > 0.001 && tokenIn.length > 0) {
-            for (const t of tokenIn) {
-                if (t.mint === SOL_MINT) continue;
-                swaps.push({
-                    type: 'BUY',
-                    token: t.mint,
-                    tokenAmount: t.amount,
-                    solAmount: solOut,
-                    timestamp: ts,
-                    sig: sig,
-                    hour: new Date(ts).getUTCHours()
-                });
-            }
-        }
-
-        // SELL: token goes out, SOL comes in
-        if (solIn > 0.001 && tokenOut.length > 0) {
-            for (const t of tokenOut) {
-                if (t.mint === SOL_MINT) continue;
-                swaps.push({
-                    type: 'SELL',
-                    token: t.mint,
-                    tokenAmount: t.amount,
-                    solAmount: solIn,
-                    timestamp: ts,
-                    sig: sig,
-                    hour: new Date(ts).getUTCHours()
-                });
-            }
-        }
-    }
-
-    return swaps.sort((a, b) => a.timestamp - b.timestamp);
-}
-
-function computeProfile(swaps) {
-    // Group by token
-    const tokens = {};
-    for (const s of swaps) {
-        if (!tokens[s.token]) tokens[s.token] = { buys: [], sells: [], totalBuySOL: 0, totalSellSOL: 0 };
-        const t = tokens[s.token];
-        if (s.type === 'BUY') {
-            t.buys.push(s);
-            t.totalBuySOL += s.solAmount;
-        } else {
-            t.sells.push(s);
-            t.totalSellSOL += s.solAmount;
-        }
-    }
-
-    // Compute per-token PnL and hold times
-    const tokenStats = [];
-    let totalWins = 0, totalLosses = 0, totalPnL = 0;
-    const holdTimes = [];
-    const hours = new Array(24).fill(0);
-
-    for (const [mint, data] of Object.entries(tokens)) {
-        const pnl = data.totalSellSOL - data.totalBuySOL;
-        const isWin = pnl > 0;
-        if (data.totalSellSOL > 0) {
-            if (isWin) totalWins++;
-            else totalLosses++;
-        }
-        totalPnL += pnl;
-
-        // Estimate hold time: avg time between first buy and first sell
-        if (data.buys.length > 0 && data.sells.length > 0) {
-            const firstBuy = data.buys[0].timestamp;
-            const firstSell = data.sells[0].timestamp;
-            if (firstSell > firstBuy) {
-                holdTimes.push(firstSell - firstBuy);
-            }
-        }
-
-        tokenStats.push({
-            mint,
-            pnl,
-            buySOL: data.totalBuySOL,
-            sellSOL: data.totalSellSOL,
-            trades: data.buys.length + data.sells.length,
-            buys: data.buys.length,
-            sells: data.sells.length,
-            isWin
-        });
-    }
-
-    // Hours
-    for (const s of swaps) {
-        hours[s.hour]++;
-    }
-
-    // Sort tokens by absolute PnL
-    tokenStats.sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
-
-    const completedTrades = totalWins + totalLosses;
-    const winRate = completedTrades > 0 ? (totalWins / completedTrades * 100) : 0;
-    const avgHold = holdTimes.length > 0 ? holdTimes.reduce((a, b) => a + b, 0) / holdTimes.length : 0;
-
-    return {
-        totalSwaps: swaps.length,
-        uniqueTokens: Object.keys(tokens).length,
-        completedTrades,
-        winRate,
-        totalWins,
-        totalLosses,
-        totalPnL,
-        avgHoldMs: avgHold,
-        hours,
-        tokenStats,
-        totalBuySOL: Object.values(tokens).reduce((a, t) => a + t.totalBuySOL, 0),
-        totalSellSOL: Object.values(tokens).reduce((a, t) => a + t.totalSellSOL, 0)
-    };
-}
-
-function formatHoldTime(ms) {
+function formatHold(ms) {
     if (ms < 60000) return Math.round(ms / 1000) + 's';
     if (ms < 3600000) return Math.round(ms / 60000) + 'm';
     if (ms < 86400000) return (ms / 3600000).toFixed(1) + 'h';
     return (ms / 86400000).toFixed(1) + 'd';
 }
 
-function formatTime(ts) {
-    const d = new Date(ts);
-    const month = d.toLocaleString('en', { month: 'short' });
-    const day = d.getDate();
-    const h = d.getUTCHours().toString().padStart(2, '0');
-    const m = d.getUTCMinutes().toString().padStart(2, '0');
-    return month + ' ' + day + ' ' + h + ':' + m;
+// Fetch SOL price
+async function fetchSolPrice() {
+    try {
+        const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const d = await r.json();
+        solPrice = d.solana.usd;
+    } catch(e) { solPrice = 170; }
 }
 
-async function resolveTokenNames(mints) {
-    const unknown = mints.filter(m => !tokenNames[m]);
-    // Batch in groups of 30
+// Fetch all transactions
+async function fetchTxs(address, maxTx) {
+    const all = [];
+    let before = undefined;
+    const batch = 100;
+    while (all.length < maxTx) {
+        let url = API_BASE + '/addresses/' + address + '/transactions?api-key=' + apiKey + '&limit=' + batch;
+        if (before) url += '&before=' + before;
+        setProgress(Math.min(50, (all.length / maxTx) * 50), 'Fetching transactions... ' + all.length);
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) { if (resp.status === 429) { await sleep(2000); continue; } break; }
+            const data = await resp.json();
+            if (!data.length) break;
+            all.push(...data);
+            before = data[data.length - 1].signature;
+            if (data.length < batch) break;
+        } catch(e) { break; }
+        await sleep(120);
+    }
+    return all.slice(0, maxTx);
+}
+
+// Parse all swaps from transactions
+function parseSwaps(txs, wallet) {
+    const swaps = [];
+    const SOL = 'So11111111111111111111111111111111111111112';
+    for (const tx of txs) {
+        if (tx.transactionError) continue;
+        const ts = tx.timestamp * 1000;
+        const sig = tx.signature;
+        const transfers = tx.tokenTransfers || [];
+        const natives = tx.nativeTransfers || [];
+
+        let solIn = 0, solOut = 0;
+        for (const n of natives) {
+            if (n.toUserAccount === wallet) solIn += n.amount / 1e9;
+            if (n.fromUserAccount === wallet) solOut += n.amount / 1e9;
+        }
+
+        const tokIn = [], tokOut = [];
+        for (const t of transfers) {
+            if (t.mint === SOL) continue;
+            if (t.toUserAccount === wallet) tokIn.push({ mint: t.mint, amount: t.tokenAmount });
+            if (t.fromUserAccount === wallet) tokOut.push({ mint: t.mint, amount: t.tokenAmount });
+        }
+
+        if (solOut > 0.0005 && tokIn.length > 0) {
+            for (const t of tokIn) {
+                swaps.push({ type: 'BUY', token: t.mint, tokenAmount: t.amount, solAmount: solOut / tokIn.length, ts, sig, hour: new Date(ts).getUTCHours() });
+            }
+        }
+        if (solIn > 0.0005 && tokOut.length > 0) {
+            for (const t of tokOut) {
+                swaps.push({ type: 'SELL', token: t.mint, tokenAmount: t.amount, solAmount: solIn / tokOut.length, ts, sig, hour: new Date(ts).getUTCHours() });
+            }
+        }
+    }
+    return swaps.sort((a, b) => a.ts - b.ts);
+}
+
+// Fetch current token balances
+async function fetchBalances(wallet) {
+    const rpc = RPC_URL + apiKey;
+    const balances = {};
+    // SPL tokens
+    for (const prog of ['TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb']) {
+        try {
+            const resp = await fetch(rpc, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0', id: 1,
+                    method: 'getTokenAccountsByOwner',
+                    params: [wallet, { programId: prog }, { encoding: 'jsonParsed' }]
+                })
+            });
+            const data = await resp.json();
+            if (data.result && data.result.value) {
+                for (const acc of data.result.value) {
+                    const info = acc.account.data.parsed.info;
+                    const amt = parseFloat(info.tokenAmount.uiAmountString || '0');
+                    if (amt > 0) {
+                        balances[info.mint] = (balances[info.mint] || 0) + amt;
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+    // SOL balance
+    try {
+        const resp = await fetch(rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [wallet] })
+        });
+        const data = await resp.json();
+        balances['SOL_NATIVE'] = (data.result.value || 0) / 1e9;
+    } catch(e) {}
+    return balances;
+}
+
+// Resolve token metadata from DexScreener
+async function resolveTokens(mints) {
+    const unknown = mints.filter(m => !tokenMeta[m]);
     for (let i = 0; i < unknown.length; i += 30) {
         const batch = unknown.slice(i, i + 30);
+        setProgress(55 + (i / unknown.length) * 20, 'Resolving tokens... ' + (i + batch.length) + '/' + unknown.length);
         try {
-            const resp = await fetch(TOKEN_LIST_API + batch.join(','));
+            const resp = await fetch(DEXSCREENER + batch.join(','));
             if (resp.ok) {
                 const data = await resp.json();
                 if (data.pairs) {
                     for (const p of data.pairs) {
-                        if (p.baseToken && p.baseToken.address && p.baseToken.symbol) {
-                            tokenNames[p.baseToken.address] = p.baseToken.symbol;
+                        const bt = p.baseToken;
+                        if (bt && bt.address && !tokenMeta[bt.address]) {
+                            tokenMeta[bt.address] = {
+                                symbol: bt.symbol || shortAddr(bt.address),
+                                name: bt.name || '',
+                                logo: p.info && p.info.imageUrl ? p.info.imageUrl : '',
+                                price: parseFloat(p.priceNative) || 0, // price in SOL
+                                priceUsd: parseFloat(p.priceUsd) || 0
+                            };
                         }
                     }
                 }
@@ -548,151 +609,331 @@ async function resolveTokenNames(mints) {
         } catch(e) {}
         if (i + 30 < unknown.length) await sleep(300);
     }
+    // Fill unknowns
+    for (const m of mints) {
+        if (!tokenMeta[m]) tokenMeta[m] = { symbol: shortAddr(m), name: '', logo: '', price: 0, priceUsd: 0 };
+    }
 }
 
-function shortAddr(a) { return a.slice(0, 4) + '...' + a.slice(-4); }
-function tokenName(mint) { return tokenNames[mint] || shortAddr(mint); }
+// Compute everything
+function computeData(swaps, balances, days) {
+    const cutoff = days >= 9999 ? 0 : Date.now() - days * 86400000;
+    const filtered = swaps.filter(s => s.ts >= cutoff);
 
-function renderProfile(wallet, profile, swaps) {
+    // Group by token
+    const tokens = {};
+    for (const s of filtered) {
+        if (!tokens[s.token]) tokens[s.token] = { buys: [], sells: [], totalBuy: 0, totalSell: 0, totalBuyTokens: 0, totalSellTokens: 0 };
+        const t = tokens[s.token];
+        if (s.type === 'BUY') {
+            t.buys.push(s);
+            t.totalBuy += s.solAmount;
+            t.totalBuyTokens += s.tokenAmount;
+        } else {
+            t.sells.push(s);
+            t.totalSell += s.solAmount;
+            t.totalSellTokens += s.tokenAmount;
+        }
+    }
+
+    // Active positions: tokens with remaining balance
+    const active = [];
+    const history = [];
+
+    for (const [mint, data] of Object.entries(tokens)) {
+        const meta = tokenMeta[mint] || {};
+        const bal = balances[mint] || 0;
+        const remaining = bal > 0 ? bal * (meta.price || 0) : 0; // in SOL
+        const remainingTokens = bal;
+        const realized = data.totalSell - data.totalBuy;
+        const unrealized = remaining - (data.totalBuy - data.totalSell > 0 ? data.totalBuy - data.totalSell : 0);
+        const totalPnl = data.totalSell + remaining - data.totalBuy;
+        const pnlPct = data.totalBuy > 0 ? ((totalPnl / data.totalBuy) * 100) : 0;
+
+        // Hold time
+        let holdMs = 0;
+        if (data.buys.length && data.sells.length) {
+            holdMs = data.sells[0].ts - data.buys[0].ts;
+        }
+
+        const entry = {
+            mint, meta,
+            bought: data.totalBuy,
+            boughtTokens: data.totalBuyTokens,
+            sold: data.totalSell,
+            soldTokens: data.totalSellTokens,
+            remaining,
+            remainingTokens: bal,
+            pnl: totalPnl,
+            pnlPct,
+            realized,
+            holdMs,
+            numBuys: data.buys.length,
+            numSells: data.sells.length,
+            lastTrade: Math.max(...[...data.buys, ...data.sells].map(s => s.ts))
+        };
+
+        if (bal > 0 && data.totalBuy > 0.001) {
+            active.push(entry);
+        } else if (data.totalSell > 0) {
+            history.push(entry);
+        }
+    }
+
+    // PnL distribution
+    const allEntries = [...active, ...history].filter(e => e.sold > 0 || e.remaining > 0);
+    const dist = { gt500: 0, gt200: 0, gt0: 0, gtNeg50: 0, ltNeg50: 0 };
+    for (const e of allEntries) {
+        if (e.pnlPct > 500) dist.gt500++;
+        else if (e.pnlPct > 200) dist.gt200++;
+        else if (e.pnlPct >= 0) dist.gt0++;
+        else if (e.pnlPct >= -50) dist.gtNeg50++;
+        else dist.ltNeg50++;
+    }
+
+    // Totals
+    const totalPnl = [...active, ...history].reduce((a, e) => a + e.pnl, 0);
+    const realizedPnl = [...active, ...history].reduce((a, e) => a + e.realized, 0);
+    const unrealizedPnl = active.reduce((a, e) => a + (e.remaining - Math.max(0, e.bought - e.sold)), 0);
+    const totalBuys = filtered.filter(s => s.type === 'BUY').length;
+    const totalSells = filtered.filter(s => s.type === 'SELL').length;
+
+    // Balance
+    const solBal = balances['SOL_NATIVE'] || 0;
+    const tradeableBal = active.reduce((a, e) => a + e.remaining, 0);
+
+    // Stablecoin check
+    const stablecoins = ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'];
+    let stableBal = 0;
+    for (const s of stablecoins) stableBal += (balances[s] || 0);
+
+    // Hours
+    const hours = new Array(24).fill(0);
+    for (const s of filtered) hours[s.hour]++;
+
+    return {
+        active, history, dist, totalPnl, realizedPnl, unrealizedPnl,
+        totalTxs: filtered.length, totalBuys, totalSells,
+        solBal, tradeableBal, stableBal,
+        hours
+    };
+}
+
+function renderProfile(wallet, data) {
     document.getElementById('emptyState').style.display = 'none';
     document.getElementById('profileContent').style.display = 'block';
 
-    // Wallet links
-    document.getElementById('walletLinks').innerHTML =
-        '<a href="https://solscan.io/account/' + wallet + '" target="_blank" class="solscan" style="background:#3b82f622;color:#3b82f6;">Solscan</a>' +
-        '<a href="https://birdeye.so/profile/' + wallet + '?chain=solana" target="_blank" class="birdeye" style="background:#22c55e22;color:#22c55e;">Birdeye</a>';
+    // Header
+    document.getElementById('walletHeader').innerHTML =
+        '<div class="wallet-name">' + shortAddr(wallet) + '</div>' +
+        '<div class="wallet-addr" onclick="navigator.clipboard.writeText(\'' + wallet + '\')" title="Click to copy">' + wallet + '</div>' +
+        '<div class="wallet-links">' +
+            '<a href="https://solscan.io/account/' + wallet + '" target="_blank" class="wl-solscan">Solscan</a>' +
+            '<a href="https://birdeye.so/profile/' + wallet + '?chain=solana" target="_blank" class="wl-birdeye">Birdeye</a>' +
+            '<a href="https://gmgn.ai/sol/address/' + wallet + '" target="_blank" class="wl-gmgn">GMGN</a>' +
+        '</div>';
 
-    // Summary cards
-    const pnlColor = profile.totalPnL >= 0 ? 'green' : 'red';
-    const pnlSign = profile.totalPnL >= 0 ? '+' : '';
-    document.getElementById('summaryCards').innerHTML =
-        '<div class="card"><div class="card-label">Win Rate</div><div class="card-value ' +
-            (profile.winRate >= 50 ? 'green' : 'red') + '">' + profile.winRate.toFixed(1) + '%</div>' +
-            '<div class="card-sub">' + profile.totalWins + 'W / ' + profile.totalLosses + 'L (' + profile.completedTrades + ' closed)</div></div>' +
-        '<div class="card"><div class="card-label">Total PnL</div><div class="card-value ' + pnlColor + '">' +
-            pnlSign + profile.totalPnL.toFixed(2) + ' SOL</div>' +
-            '<div class="card-sub">Bought: ' + profile.totalBuySOL.toFixed(1) + ' | Sold: ' + profile.totalSellSOL.toFixed(1) + '</div></div>' +
-        '<div class="card"><div class="card-label">Avg Hold Time</div><div class="card-value blue">' +
-            formatHoldTime(profile.avgHoldMs) + '</div>' +
-            '<div class="card-sub">Based on ' + profile.completedTrades + ' round trips</div></div>' +
-        '<div class="card"><div class="card-label">Total Swaps</div><div class="card-value yellow">' +
-            profile.totalSwaps + '</div>' +
-            '<div class="card-sub">' + profile.uniqueTokens + ' unique tokens</div></div>' +
-        '<div class="card"><div class="card-label">Volume</div><div class="card-value">' +
-            (profile.totalBuySOL + profile.totalSellSOL).toFixed(1) + ' SOL</div>' +
-            '<div class="card-sub">Total traded</div></div>';
+    // Balance panel
+    const totalVal = data.solBal + data.tradeableBal;
+    const totalUsd = totalVal * solPrice;
+    document.getElementById('balancePanel').innerHTML =
+        '<div class="panel-title">Balance</div>' +
+        '<div class="panel-big">' + formatUSD(totalUsd) + '</div>' +
+        '<div class="panel-row"><span class="panel-label">Unrealized PNL</span><span class="panel-value ' + (data.unrealizedPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.unrealizedPnl >= 0 ? '+' : '') + formatUSD(data.unrealizedPnl * solPrice) + '</span></div>' +
+        '<div class="panel-row"><span class="panel-label">Tradeable Balance</span><span class="panel-value">' + formatUSD(data.tradeableBal * solPrice) + '</span></div>' +
+        '<div class="panel-row"><span class="panel-label">SOL Balance</span><span class="panel-value yellow">' + data.solBal.toFixed(2) + ' SOL</span></div>' +
+        '<div class="panel-row"><span class="panel-label">Stable Coin Balance</span><span class="panel-value">' + formatUSD(data.stableBal) + '</span></div>';
 
-    // Hours chart
-    const maxH = Math.max(...profile.hours, 1);
-    let barsHtml = '';
-    let labelsHtml = '';
-    for (let i = 0; i < 24; i++) {
-        const pct = (profile.hours[i] / maxH) * 100;
-        barsHtml += '<div class="hour-bar" style="height:' + Math.max(2, pct) + '%"><div class="tip">' + i + ':00 - ' + profile.hours[i] + ' txs</div></div>';
-        labelsHtml += '<span>' + (i % 3 === 0 ? i : '') + '</span>';
-    }
-    document.getElementById('hoursChart').innerHTML = barsHtml;
-    document.getElementById('hoursLabels').innerHTML = labelsHtml;
+    // PnL panel (simple summary)
+    document.getElementById('pnlPanel').innerHTML =
+        '<div class="panel-title">PNL</div>' +
+        '<div class="panel-big ' + (data.totalPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.totalPnl >= 0 ? '+' : '') + data.totalPnl.toFixed(2) + ' SOL</div>' +
+        '<div style="font-size:12px;color:#555;margin-bottom:8px;">' + (data.totalPnl >= 0 ? '+' : '') + formatUSD(data.totalPnl * solPrice) + '</div>' +
+        '<div class="panel-row"><span class="panel-label">Realized</span><span class="panel-value ' + (data.realizedPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.realizedPnl >= 0 ? '+' : '') + data.realizedPnl.toFixed(2) + ' SOL</span></div>' +
+        '<div class="panel-row"><span class="panel-label">Unrealized</span><span class="panel-value ' + (data.unrealizedPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.unrealizedPnl >= 0 ? '+' : '') + data.unrealizedPnl.toFixed(2) + ' SOL</span></div>';
 
-    // Top tokens (top 20)
-    const topTokens = profile.tokenStats.slice(0, 20);
-    document.getElementById('topTokens').innerHTML = topTokens.map(t => {
-        const pColor = t.pnl >= 0 ? 'green' : 'red';
-        const pSign = t.pnl >= 0 ? '+' : '';
-        const badge = t.pnl >= 0 ? 'badge-win' : 'badge-loss';
-        return '<div class="token-card">' +
-            '<div><div class="name"><a href="https://birdeye.so/token/' + t.mint + '?chain=solana" target="_blank" class="token-link">' + tokenName(t.mint) + '</a></div>' +
-            '<div class="meta">' + t.buys + ' buys, ' + t.sells + ' sells | ' + t.buySOL.toFixed(2) + ' SOL in</div></div>' +
-            '<div><div class="pnl ' + pColor + '">' + pSign + t.pnl.toFixed(2) + ' SOL</div>' +
-            '<div class="pnl-sub"><span class="' + badge + '">' + (t.pnl >= 0 ? 'WIN' : 'LOSS') + '</span></div></div></div>';
-    }).join('');
+    // Performance panel
+    const totalEntries = data.dist.gt500 + data.dist.gt200 + data.dist.gt0 + data.dist.gtNeg50 + data.dist.ltNeg50;
+    const distTotal = Math.max(totalEntries, 1);
+    document.getElementById('perfPanel').innerHTML =
+        '<div class="panel-title">Performance</div>' +
+        '<div class="panel-row"><span class="panel-label">' + currentDays + 'd Total PNL</span><span class="panel-value ' + (data.totalPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.totalPnl >= 0 ? '+' : '') + formatUSD(data.totalPnl * solPrice) + '</span></div>' +
+        '<div class="panel-row"><span class="panel-label">' + currentDays + 'd Realized PNL</span><span class="panel-value ' + (data.realizedPnl >= 0 ? 'green' : 'red') + '">' +
+            (data.realizedPnl >= 0 ? '+' : '') + formatUSD(data.realizedPnl * solPrice) + '</span></div>' +
+        '<div class="panel-row"><span class="panel-label">' + currentDays + 'd TXNS</span><span class="panel-value">' +
+            data.totalTxs + ' <span class="green">' + data.totalBuys + '</span> / <span class="red">' + data.totalSells + '</span></span></div>' +
+        '<div class="pnl-dist">' +
+            distRow('#f59e0b', '>500%', data.dist.gt500) +
+            distRow('#22c55e', '200% ~ 500%', data.dist.gt200) +
+            distRow('#06b6d4', '0% ~ 200%', data.dist.gt0) +
+            distRow('#f87171', '0% ~ -50%', data.dist.gtNeg50) +
+            distRow('#ef4444', '< -50%', data.dist.ltNeg50) +
+        '</div>' +
+        '<div class="dist-bar-wrap">' +
+            '<div class="dist-bar-seg" style="width:' + (data.dist.gt500/distTotal*100) + '%;background:#f59e0b;"></div>' +
+            '<div class="dist-bar-seg" style="width:' + (data.dist.gt200/distTotal*100) + '%;background:#22c55e;"></div>' +
+            '<div class="dist-bar-seg" style="width:' + (data.dist.gt0/distTotal*100) + '%;background:#06b6d4;"></div>' +
+            '<div class="dist-bar-seg" style="width:' + (data.dist.gtNeg50/distTotal*100) + '%;background:#f87171;"></div>' +
+            '<div class="dist-bar-seg" style="width:' + (data.dist.ltNeg50/distTotal*100) + '%;background:#ef4444;"></div>' +
+        '</div>';
 
-    // Recent trades (last 50 swaps, newest first)
-    const recent = swaps.slice(-50).reverse();
-    // Build hold time map: for sells, find matching buy
-    const tokenBuys = {};
-    for (const s of swaps) {
-        if (s.type === 'BUY') {
-            if (!tokenBuys[s.token]) tokenBuys[s.token] = [];
-            tokenBuys[s.token].push(s);
-        }
-    }
+    renderPositions(data.active);
+    renderHistory(data.history);
+    renderActivity(data.hours);
+}
 
-    document.getElementById('tradesBody').innerHTML = recent.map(s => {
-        const typeClass = s.type === 'BUY' ? 'green' : 'red';
-        let holdStr = '--';
-        if (s.type === 'SELL' && tokenBuys[s.token] && tokenBuys[s.token].length) {
-            const lastBuy = tokenBuys[s.token].filter(b => b.timestamp < s.timestamp).pop();
-            if (lastBuy) holdStr = formatHoldTime(s.timestamp - lastBuy.timestamp);
-        }
-        // Simple PnL for sells
-        let pnlStr = '--';
-        if (s.type === 'SELL') {
-            const ts = profile.tokenStats.find(t => t.mint === s.token);
-            if (ts) {
-                // Proportional PnL estimate
-                const ratio = s.solAmount / Math.max(ts.totalSellSOL, 0.001);
-                const est = ts.pnl * ratio;
-                pnlStr = '<span class="' + (est >= 0 ? 'green' : 'red') + '">' + (est >= 0 ? '+' : '') + est.toFixed(2) + '</span>';
-            }
-        }
+function distRow(color, label, count) {
+    return '<div class="dist-row"><div class="dist-dot" style="background:' + color + '"></div><span class="dist-label">' + label + '</span><span class="dist-count">' + count + '</span></div>';
+}
+
+function renderPositions(positions) {
+    const sortKey = currentSort.key;
+    const dir = currentSort.dir;
+    positions.sort((a, b) => {
+        if (sortKey === 'name') return dir * ((a.meta.symbol || '').localeCompare(b.meta.symbol || ''));
+        if (sortKey === 'bought') return dir * (a.bought - b.bought);
+        if (sortKey === 'sold') return dir * (a.sold - b.sold);
+        if (sortKey === 'remaining') return dir * (a.remaining - b.remaining);
+        if (sortKey === 'pnl') return dir * (a.pnlPct - b.pnlPct);
+        return 0;
+    });
+
+    const search = (document.getElementById('posSearch').value || '').toLowerCase();
+    const filtered = search ? positions.filter(p => (p.meta.symbol || '').toLowerCase().includes(search) || p.mint.toLowerCase().includes(search)) : positions;
+
+    document.getElementById('posBody').innerHTML = filtered.map(p => {
+        const icon = p.meta.logo ? '<img src="' + p.meta.logo + '" onerror="this.style.display=\'none\'">' : p.meta.symbol.charAt(0).toUpperCase();
+        const pColor = p.pnlPct >= 0 ? 'green' : 'red';
+        const pSign = p.pnl >= 0 ? '+' : '';
         return '<tr>' +
-            '<td>' + formatTime(s.timestamp) + '</td>' +
-            '<td><span class="' + typeClass + '">' + s.type + '</span></td>' +
-            '<td><a href="https://birdeye.so/token/' + s.token + '?chain=solana" target="_blank" class="token-link">' + tokenName(s.token) + '</a></td>' +
-            '<td>' + s.solAmount.toFixed(3) + '</td>' +
-            '<td>' + pnlStr + '</td>' +
-            '<td>' + holdStr + '</td>' +
-            '<td class="links">' +
-                '<a href="https://solscan.io/tx/' + s.sig + '" target="_blank" class="solscan">Tx</a>' +
-            '</td></tr>';
+            '<td><div class="token-info"><div class="token-icon">' + icon + '</div><div>' +
+                '<div class="token-name"><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank">' + p.meta.symbol + '</a>' +
+                '<span class="token-buys-badge">' + p.numBuys + '</span></div>' +
+                '<div class="token-desc">' + (p.meta.name || shortAddr(p.mint)) + '</div></div></div></td>' +
+            '<td><div class="cell-sol">' + p.bought.toFixed(3) + '</div><div class="cell-token">' + formatNum(p.boughtTokens) + ' ' + p.meta.symbol + '</div></td>' +
+            '<td><div class="cell-sol' + (p.sold === 0 ? ' red' : '') + '">' + (p.sold === 0 ? '0' : p.sold.toFixed(3)) + '</div>' +
+                '<div class="cell-token">' + formatNum(p.soldTokens) + ' ' + p.meta.symbol + '</div></td>' +
+            '<td><div class="cell-sol">' + p.remaining.toFixed(3) + '</div><div class="cell-token">' + formatNum(p.remainingTokens) + ' ' + p.meta.symbol + '</div></td>' +
+            '<td><div class="cell-pnl ' + pColor + '">' + pSign + p.pnl.toFixed(3) + '</div>' +
+                '<div class="cell-pnl-pct ' + pColor + '">(' + pSign + p.pnlPct.toFixed(1) + '%)</div></td>' +
+            '<td><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank" class="action-link">Chart</a></td>' +
+        '</tr>';
     }).join('');
+}
+
+function renderHistory(hist) {
+    hist.sort((a, b) => b.lastTrade - a.lastTrade);
+    const search = (document.getElementById('histSearch').value || '').toLowerCase();
+    const filtered = search ? hist.filter(p => (p.meta.symbol || '').toLowerCase().includes(search) || p.mint.toLowerCase().includes(search)) : hist;
+
+    document.getElementById('histBody').innerHTML = filtered.slice(0, 100).map(p => {
+        const pColor = p.pnlPct >= 0 ? 'green' : 'red';
+        const pSign = p.pnl >= 0 ? '+' : '';
+        return '<tr>' +
+            '<td><div class="token-info"><div class="token-icon">' + (p.meta.logo ? '<img src="' + p.meta.logo + '" onerror="this.style.display=\'none\'">' : p.meta.symbol.charAt(0)) + '</div><div>' +
+                '<div class="token-name"><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank">' + p.meta.symbol + '</a></div>' +
+                '<div class="token-desc">' + (p.meta.name || shortAddr(p.mint)) + '</div></div></div></td>' +
+            '<td class="cell-sol">' + p.bought.toFixed(3) + '</td>' +
+            '<td class="cell-sol">' + p.sold.toFixed(3) + '</td>' +
+            '<td class="cell-pnl ' + pColor + '">' + pSign + p.pnl.toFixed(3) + ' SOL</td>' +
+            '<td class="cell-pnl-pct ' + pColor + '">' + pSign + p.pnlPct.toFixed(1) + '%</td>' +
+            '<td>' + (p.holdMs > 0 ? formatHold(p.holdMs) : '--') + '</td>' +
+            '<td><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank" class="action-link">Chart</a></td>' +
+        '</tr>';
+    }).join('');
+}
+
+function renderActivity(hours) {
+    const maxH = Math.max(...hours, 1);
+    let bars = '', labels = '';
+    for (let i = 0; i < 24; i++) {
+        const pct = (hours[i] / maxH) * 100;
+        bars += '<div style="flex:1;background:#7dd3fc44;border-radius:2px 2px 0 0;height:' + Math.max(2, pct) + '%;position:relative;cursor:pointer" title="' + i + ':00 UTC - ' + hours[i] + ' txs"></div>';
+        labels += '<span style="flex:1;text-align:center;font-size:8px;color:#444">' + (i % 3 === 0 ? i : '') + '</span>';
+    }
+    document.getElementById('hoursChart').innerHTML = bars;
+    document.getElementById('hoursLabels').innerHTML = labels;
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+});
+
+// Time selector
+document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentDays = parseInt(btn.dataset.days);
+        recompute();
+    });
+});
+
+// Column sorting
+document.querySelectorAll('.pos-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (currentSort.key === key) currentSort.dir *= -1;
+        else { currentSort.key = key; currentSort.dir = -1; }
+        document.querySelectorAll('.pos-table th').forEach(t => t.classList.remove('sorted'));
+        th.classList.add('sorted');
+        recompute();
+    });
+});
+
+// Search
+document.getElementById('posSearch').addEventListener('input', () => recompute());
+document.getElementById('histSearch').addEventListener('input', () => recompute());
+
+let cachedBalances = {};
+function recompute() {
+    const data = computeData(allSwaps, cachedBalances, currentDays);
+    renderProfile(currentWallet, data);
 }
 
 async function analyze() {
     apiKey = getApiKey();
     if (!apiKey) return;
+    currentWallet = document.getElementById('walletInput').value.trim();
+    if (!currentWallet || currentWallet.length < 32) return alert('Enter a valid wallet address');
 
-    const wallet = document.getElementById('walletInput').value.trim();
-    if (!wallet || wallet.length < 32) return alert('Enter a valid wallet address');
+    setProgress(0, 'Starting...');
+    await fetchSolPrice();
 
-    const limit = parseInt(document.getElementById('txCount').value);
+    setProgress(5, 'Fetching balances...');
+    cachedBalances = await fetchBalances(currentWallet);
 
-    setProgress(0, 'Fetching transactions...');
-    const txs = await fetchTxs(wallet, limit);
-    if (!txs.length) {
-        hideProgress();
-        return alert('No transactions found for this wallet');
-    }
+    const txs = await fetchTxs(currentWallet, 1000);
+    if (!txs.length) { hideProgress(); return alert('No transactions found'); }
 
-    setProgress(70, 'Parsing ' + txs.length + ' transactions...');
-    const swaps = parseSwaps(txs, wallet);
+    setProgress(50, 'Parsing swaps...');
+    allSwaps = parseSwaps(txs, currentWallet);
 
-    if (!swaps.length) {
-        hideProgress();
-        return alert('No swaps found in ' + txs.length + ' transactions');
-    }
+    const mints = [...new Set(allSwaps.map(s => s.token))];
+    await resolveTokens(mints);
 
-    setProgress(80, 'Resolving token names...');
-    const uniqueMints = [...new Set(swaps.map(s => s.token))];
-    await resolveTokenNames(uniqueMints);
-
-    setProgress(90, 'Computing profile...');
-    const profile = computeProfile(swaps);
+    setProgress(95, 'Computing...');
+    const data = computeData(allSwaps, cachedBalances, currentDays);
 
     setProgress(100, 'Done!');
-    await sleep(300);
+    await sleep(200);
     hideProgress();
 
-    renderProfile(wallet, profile, swaps);
+    renderProfile(currentWallet, data);
 }
 
-// Allow Enter key
-document.getElementById('walletInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') analyze();
-});
-
-// Check URL params
+document.getElementById('walletInput').addEventListener('keydown', e => { if (e.key === 'Enter') analyze(); });
 const params = new URLSearchParams(location.search);
 if (params.get('wallet')) {
     document.getElementById('walletInput').value = params.get('wallet');
