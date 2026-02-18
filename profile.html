@@ -917,6 +917,15 @@ function distRow(color, label, count) {
     return '<div class="dist-row"><div class="dist-dot" style="background:' + color + '"></div><span class="dist-label">' + label + '</span><span class="dist-count">' + count + '</span></div>';
 }
 
+function solOrUsd(sol) {
+    const unit = document.getElementById('showUnit').value;
+    if (unit === 'USD') return formatUSD(sol * solPrice);
+    return sol.toFixed(3);
+}
+function solOrUsdLabel() {
+    return document.getElementById('showUnit').value === 'USD' ? '$' : 'SOL';
+}
+
 function renderPositions(positions) {
     const sortKey = currentSort.key;
     const dir = currentSort.dir;
@@ -941,11 +950,11 @@ function renderPositions(positions) {
                 '<div class="token-name"><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank">' + p.meta.symbol + '</a>' +
                 '<span class="token-buys-badge">' + p.numBuys + '</span></div>' +
                 '<div class="token-desc">' + (p.meta.name || shortAddr(p.mint)) + '</div></div></div></td>' +
-            '<td><div class="cell-sol">' + p.bought.toFixed(3) + '</div><div class="cell-token">' + formatNum(p.boughtTokens) + ' ' + p.meta.symbol + '</div></td>' +
-            '<td><div class="cell-sol' + (p.sold === 0 ? ' red' : '') + '">' + (p.sold === 0 ? '0' : p.sold.toFixed(3)) + '</div>' +
+            '<td><div class="cell-sol">' + solOrUsd(p.bought) + '</div><div class="cell-token">' + formatNum(p.boughtTokens) + ' ' + p.meta.symbol + '</div></td>' +
+            '<td><div class="cell-sol' + (p.sold === 0 ? ' red' : '') + '">' + (p.sold === 0 ? '0' : solOrUsd(p.sold)) + '</div>' +
                 '<div class="cell-token">' + formatNum(p.soldTokens) + ' ' + p.meta.symbol + '</div></td>' +
-            '<td><div class="cell-sol">' + p.remaining.toFixed(3) + '</div><div class="cell-token">' + formatNum(p.remainingTokens) + ' ' + p.meta.symbol + '</div></td>' +
-            '<td><div class="cell-pnl ' + pColor + '">' + pSign + p.pnl.toFixed(3) + '</div>' +
+            '<td><div class="cell-sol">' + solOrUsd(p.remaining) + '</div><div class="cell-token">' + formatNum(p.remainingTokens) + ' ' + p.meta.symbol + '</div></td>' +
+            '<td><div class="cell-pnl ' + pColor + '">' + pSign + solOrUsd(p.pnl) + '</div>' +
                 '<div class="cell-pnl-pct ' + pColor + '">(' + pSign + p.pnlPct.toFixed(1) + '%)</div></td>' +
             '<td><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank" class="action-link">Chart</a></td>' +
         '</tr>';
@@ -964,9 +973,9 @@ function renderHistory(hist) {
             '<td><div class="token-info"><div class="token-icon">' + (p.meta.logo ? '<img src="' + p.meta.logo + '" onerror="this.style.display=\'none\'">' : p.meta.symbol.charAt(0)) + '</div><div>' +
                 '<div class="token-name"><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank">' + p.meta.symbol + '</a></div>' +
                 '<div class="token-desc">' + (p.meta.name || shortAddr(p.mint)) + '</div></div></div></td>' +
-            '<td class="cell-sol">' + p.bought.toFixed(3) + '</td>' +
-            '<td class="cell-sol">' + p.sold.toFixed(3) + '</td>' +
-            '<td class="cell-pnl ' + pColor + '">' + pSign + p.pnl.toFixed(3) + ' SOL</td>' +
+            '<td class="cell-sol">' + solOrUsd(p.bought) + '</td>' +
+            '<td class="cell-sol">' + solOrUsd(p.sold) + '</td>' +
+            '<td class="cell-pnl ' + pColor + '">' + pSign + solOrUsd(p.pnl) + '</td>' +
             '<td class="cell-pnl-pct ' + pColor + '">' + pSign + p.pnlPct.toFixed(1) + '%</td>' +
             '<td>' + (p.holdMs > 0 ? formatHold(p.holdMs) : '--') + '</td>' +
             '<td><a href="https://birdeye.so/token/' + p.mint + '?chain=solana" target="_blank" class="action-link">Chart</a></td>' +
@@ -1021,9 +1030,10 @@ document.querySelectorAll('.pos-table th[data-sort]').forEach(th => {
     });
 });
 
-// Search
+// Search + unit toggle
 document.getElementById('posSearch').addEventListener('input', () => recompute());
 document.getElementById('histSearch').addEventListener('input', () => recompute());
+document.getElementById('showUnit').addEventListener('change', () => recompute());
 
 let cachedBalances = {};
 function recompute() {
