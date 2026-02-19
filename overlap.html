@@ -173,7 +173,7 @@ async function startScan() {
     if (isRunning) return;
     
     const input = document.getElementById('walletsInput').value.trim();
-    const wallets = input.split('').map(l => l.trim()).filter(l => l.length >= 32);
+    const wallets = input.split(/[\n\r,\s]+/).map(l => l.trim()).filter(l => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(l));
     if (wallets.length < 2) return alert('Need at least 2 wallet addresses');
     
     isRunning = true;

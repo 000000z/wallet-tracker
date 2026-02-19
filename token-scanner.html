@@ -554,12 +554,12 @@ function copySelected() {
     const addrs = [];
     document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => addrs.push(cb.dataset.addr));
     if (!addrs.length) return showToast('Nothing selected');
-    navigator.clipboard.writeText(addrs.join('')).then(() => showToast(addrs.length + ' addresses copied'));
+    navigator.clipboard.writeText(addrs.join('\n')).then(() => showToast(addrs.length + ' addresses copied'));
 }
 function copyAll() {
     const addrs = results.map(r => r.address);
     if (!addrs.length) return showToast('No results');
-    navigator.clipboard.writeText(addrs.join('')).then(() => showToast(addrs.length + ' addresses copied'));
+    navigator.clipboard.writeText(addrs.join('\n')).then(() => showToast(addrs.length + ' addresses copied'));
 }
 function copyAddr(addr) { navigator.clipboard.writeText(addr).then(() => showToast('Copied: ' + addr)); }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }

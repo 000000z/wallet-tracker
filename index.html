@@ -4661,7 +4661,7 @@ function rejectSelected() {
 function exportApproved() {
     const approved = data.filter(w => decisions[w.address] === 'approved');
     if (approved.length === 0) { showToast('No wallets approved yet'); return; }
-    const text = approved.map(w => w.address + ' | ' + w.sentBy + ' | ' + w.classification).join('');
+    const text = approved.map(w => w.address + ' | ' + w.sentBy + ' | ' + w.classification).join('\n');
     navigator.clipboard.writeText(text).then(() => showToast(approved.length + ' wallets copied to clipboard'));
     const json = JSON.stringify(approved.map(w => ({ address: w.address, name: w.sentBy + ' new', linkedTo: w.sentBy, classification: w.classification })), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
