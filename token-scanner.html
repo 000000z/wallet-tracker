@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -327,46 +327,43 @@ async function startScan() {
         // Get unique accounts from earliest signatures
         setProgress(20, 'Identifying early buyers...');
         
-        // Process earliest sigs first � fetch their details
+        // Process earliest sigs in parallel batches of 10
         const earliestSigs = allSigs.slice(0, Math.min(200, allSigs.length));
         const uniqueAccounts = {};
-        
-        for (let i = 0; i < earliestSigs.length; i += 20) {
-            const batch = earliestSigs.slice(i, i + 20).map(s => s.signature);
-            // Use getTransaction for each to find signers
-            for (const sig of batch) {
-                try {
-                    const txResp = await rpcCall('getTransaction', [sig, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]);
-                    await sleep(delayMs / 2);
-                    if (!txResp.result) continue;
-                    
-                    const accounts = txResp.result.transaction.message.accountKeys || [];
-                    const blockTime = txResp.result.blockTime || 0;
-                    
-                    // The first signer is typically the buyer
-                    for (const acc of accounts) {
-                        const addr = acc.pubkey || acc;
-                        if (typeof addr !== 'string' || addr.length < 32) continue;
-                        if (addr === tokenMint) continue;
-                        if (addr === '11111111111111111111111111111111') continue;
-                        if (addr === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') continue;
-                        if (addr === 'ComputeBudget111111111111111111111111111111') continue;
-                        if (addr === 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL') continue;
-                        
-                        const isSigner = acc.signer === true;
-                        if (isSigner && !uniqueAccounts[addr]) {
-                            uniqueAccounts[addr] = { firstSeen: blockTime, sig };
-                        }
+        const SKIP_ADDRS = new Set([
+            '11111111111111111111111111111111',
+            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+            'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+            'ComputeBudget111111111111111111111111111111',
+            'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+            tokenMint
+        ]);
+
+        for (let i = 0; i < earliestSigs.length; i += 10) {
+            const batch = earliestSigs.slice(i, i + 10);
+            const txResults = await Promise.all(batch.map(s =>
+                rpcCall('getTransaction', [s.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]).catch(() => null)
+            ));
+
+            for (const txResp of txResults) {
+                if (!txResp || !txResp.result) continue;
+                const accounts = txResp.result.transaction.message.accountKeys || [];
+                const blockTime = txResp.result.blockTime || 0;
+                for (const acc of accounts) {
+                    const addr = acc.pubkey || acc;
+                    if (typeof addr !== 'string' || addr.length < 32) continue;
+                    if (SKIP_ADDRS.has(addr)) continue;
+                    if (acc.signer === true && !uniqueAccounts[addr]) {
+                        uniqueAccounts[addr] = { firstSeen: blockTime, sig: txResp.result.transaction.signatures[0] };
                     }
-                } catch(e) { continue; }
+                }
             }
-            
+
             const pct = 20 + Math.floor((i / earliestSigs.length) * 30);
-            setProgress(pct, 'Parsing tx ' + Math.min(i + 20, earliestSigs.length) + '/' + earliestSigs.length);
-            
+            setProgress(pct, 'Parsing tx ' + Math.min(i + 10, earliestSigs.length) + '/' + earliestSigs.length + ' (10x parallel)');
+            await sleep(delayMs);
             if (Object.keys(uniqueAccounts).length >= maxBuyers) break;
         }
-        
         // Sort by first seen time
         let buyers = Object.entries(uniqueAccounts)
             .map(([addr, info]) => ({ address: addr, buyTime: info.firstSeen }))
@@ -376,42 +373,31 @@ async function startScan() {
         log('Found ' + buyers.length + ' unique early signers');
         setProgress(55, 'Classifying ' + buyers.length + ' wallets...');
         
-        // Step 3: Classify each buyer
-        for (let i = 0; i < buyers.length; i++) {
-            const buyer = buyers[i];
+        // Step 3: Classify buyers in parallel batches
+        const PARALLEL = 5;
+        const tokenFirstSeen = allSigs[0] ? allSigs[0].blockTime : 0;
+        let classified = 0;
+
+        async function classifyOne(buyer) {
             const short = shortAddr(buyer.address);
-            const pct = 55 + Math.floor((i / buyers.length) * 40);
-            setProgress(pct, 'Classifying ' + (i + 1) + '/' + buyers.length + ' - ' + short);
-            
             try {
-                // Get account info
-                const acctResp = await rpcCall('getAccountInfo', [buyer.address, { encoding: 'jsonParsed' }]);
-                await sleep(delayMs);
-                
+                // Parallel: get account info + enhanced txs + total sigs at once
+                const [acctResp, txPage1, sigResp2] = await Promise.all([
+                    rpcCall('getAccountInfo', [buyer.address, { encoding: 'jsonParsed' }]),
+                    enhancedTxs(buyer.address, 100, null),
+                    rpcCall('getSignaturesForAddress', [buyer.address, { limit: 1000 }])
+                ]);
+
                 const acctData = acctResp.result && acctResp.result.value;
-                
-                // Skip programs and mints
-                if (acctData && acctData.executable) { log(short + ' -> program (skip)', 'skip'); continue; }
-                if (acctData && acctData.data && acctData.data.program === 'spl-token') { log(short + ' -> token account (skip)', 'skip'); continue; }
-                
+                if (acctData && acctData.executable) { log(short + ' -> program (skip)', 'skip'); return null; }
+                if (acctData && acctData.data && acctData.data.program === 'spl-token') { log(short + ' -> token account (skip)', 'skip'); return null; }
+
                 const solBalance = acctData ? (acctData.lamports || 0) / 1e9 : 0;
-                
-                // Get enhanced txs for classification
-                let txs = [];
-                let bSig2 = null;
-                let pages = Math.ceil(classifyLimit / 20);
-                while (pages > 0 && txs.length < classifyLimit) {
-                    const page = await enhancedTxs(buyer.address, 20, bSig2);
-                    await sleep(delayMs);
-                    if (!page || !page.length) break;
-                    txs = txs.concat(page);
-                    if (page.length < 20) break;
-                    bSig2 = page[page.length - 1].signature;
-                    pages--;
-                }
-                
-                if (txs.length === 0) { log(short + ' -> no txs (skip)', 'skip'); continue; }
-                
+                const txs = txPage1 || [];
+                const totalSigs = sigResp2.result ? sigResp2.result.length : 0;
+
+                if (txs.length === 0) { log(short + ' -> no txs (skip)', 'skip'); return null; }
+
                 let swapCount = 0, isFeePayer = 0;
                 const interactors = {};
                 for (const tx of txs) {
@@ -420,32 +406,23 @@ async function startScan() {
                     if (tx.feePayer && tx.feePayer !== buyer.address) interactors[tx.feePayer] = true;
                 }
                 const uniqueCount = Object.keys(interactors).length;
-                const txCount = txs.length;
-                
-                // Get total sigs
-                const sigResp2 = await rpcCall('getSignaturesForAddress', [buyer.address, { limit: 1000 }]);
-                await sleep(delayMs);
-                const totalSigs = sigResp2.result ? sigResp2.result.length : 0;
-                
-                // Tags
+
                 const tags = [];
                 const isTracked = trackedAddrs.has(buyer.address);
                 if (isTracked) tags.push('TRACKED');
-                
-                if (uniqueCount > 15 && isFeePayer === 0) { log(short + ' -> CEX/protocol (skip)', 'skip'); continue; }
-                if (totalSigs >= 1000 && isFeePayer === 0) { log(short + ' -> CEX (skip)', 'skip'); continue; }
-                
-                // Is it early?
-                const tokenFirstSeen = allSigs[0] ? allSigs[0].blockTime : 0;
+
+                if (uniqueCount > 15 && isFeePayer === 0) { log(short + ' -> CEX/protocol (skip)', 'skip'); return null; }
+                if (totalSigs >= 1000 && isFeePayer === 0) { log(short + ' -> CEX (skip)', 'skip'); return null; }
+
                 if (tokenFirstSeen && buyer.buyTime && (buyer.buyTime - tokenFirstSeen) < 300) tags.push('EARLY');
                 if (solBalance > 500) tags.push('WHALE');
                 if (swapCount > 0 && isFeePayer > 0) tags.push('TRADER');
                 else if (swapCount > 0 && isFeePayer === 0) tags.push('PLATFORM');
-                
+
                 const cls = tags.includes('EARLY') ? 'early' : 'ok';
                 log(short + ' -> ' + tags.join(', ') + ' (' + swapCount + ' swaps, ' + solBalance.toFixed(1) + ' SOL)', cls);
-                
-                results.push({
+
+                return {
                     address: buyer.address,
                     buyTime: buyer.buyTime,
                     solBalance: Math.round(solBalance * 100) / 100,
@@ -454,11 +431,21 @@ async function startScan() {
                     isFeePayer,
                     tags,
                     isTracked
-                });
-                
+                };
             } catch(e) {
                 log(short + ' -> error: ' + e.message, 'skip');
+                return null;
             }
+        }
+
+        for (let i = 0; i < buyers.length; i += PARALLEL) {
+            const batch = buyers.slice(i, i + PARALLEL);
+            const pct = 55 + Math.floor((i / buyers.length) * 40);
+            setProgress(pct, 'Classifying ' + Math.min(i + PARALLEL, buyers.length) + '/' + buyers.length + ' (5x parallel)');
+            const batchResults = await Promise.all(batch.map(b => classifyOne(b)));
+            for (const r of batchResults) { if (r) results.push(r); }
+            classified += batch.length;
+            if (i + PARALLEL < buyers.length) await sleep(delayMs);
         }
         
         setProgress(100, 'Done! Found ' + results.length + ' wallet buyers');
