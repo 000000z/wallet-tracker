@@ -262,6 +262,9 @@ function timeAgo(ts) {
 
 async function startScan() {
     if (isRunning) return;
+    apiKey = getApiKey();
+    if (!apiKey) return;
+    
     const tokenMint = document.getElementById('tokenInput').value.trim();
     if (!tokenMint || tokenMint.length < 32) return alert('Enter a valid token mint address');
     
@@ -276,10 +279,8 @@ async function startScan() {
     document.getElementById('actionsBar').style.display = 'none';
     
     const maxBuyers = parseInt(document.getElementById('maxBuyers').value) || 100;
-    const classifyLimit = parseInt(document.getElementById('classifyTxs').value) || 100;
     const delayMs = parseInt(document.getElementById('delayMs').value) || 100;
     
-    // Show token info
     document.getElementById('tokenInfo').style.display = 'block';
     document.getElementById('tokenInfo').innerHTML = 
         '<div class="row"><div><div class="label">TOKEN MINT</div><div class="value" style="font-size:12px;">' + tokenMint + '</div></div></div>' +
@@ -288,254 +289,176 @@ async function startScan() {
         '<a href="https://solscan.io/token/' + tokenMint + '" target="_blank" class="solscan">Solscan</a></div>';
     
     try {
-        // Step 1: Get early transactions for this token using signatures
-        setProgress(5, 'Fetching token transactions...');
-        log('Fetching transactions for token...');
+        // Step 1: Use Helius enhanced API on token mint - much faster than raw RPC
+        setProgress(5, 'Fetching token trades via Helius...');
+        log('Fetching enhanced transactions for token...');
         
-        // Use getSignaturesForAddress on the token mint to find early txs
-        let allSigs = [];
+        let allTxs = [];
         let beforeSig = null;
-        // Fetch backwards to get earliest txs
-        while (allSigs.length < 1000) {
-            const sigResp = await rpcCall('getSignaturesForAddress', [tokenMint, { limit: 1000, before: beforeSig || undefined }]);
+        while (allTxs.length < 500) {
+            let url = 'https://api-mainnet.helius-rpc.com/v0/addresses/' + tokenMint + '/transactions?api-key=' + apiKey + '&limit=100';
+            if (beforeSig) url += '&before=' + beforeSig;
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) { if (resp.status === 429) { await sleep(2000); continue; } break; }
+                const data = await resp.json();
+                if (!data.length) break;
+                allTxs = allTxs.concat(data);
+                beforeSig = data[data.length - 1].signature;
+                if (data.length < 100) break;
+            } catch(e) { break; }
+            setProgress(5 + Math.floor((allTxs.length / 500) * 20), 'Fetched ' + allTxs.length + ' transactions...');
             await sleep(delayMs);
-            if (!sigResp.result || !sigResp.result.length) break;
-            allSigs = allSigs.concat(sigResp.result);
-            if (sigResp.result.length < 1000) break;
-            beforeSig = sigResp.result[sigResp.result.length - 1].signature;
         }
         
-        log('Found ' + allSigs.length + ' total token transactions');
+        log('Fetched ' + allTxs.length + ' enhanced transactions');
         
-        // Sort by blockTime ascending (earliest first)
-        allSigs.sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
+        // Sort earliest first
+        allTxs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         
-        // Step 2: Use enhanced API on token mint to find buyers
-        setProgress(15, 'Parsing transactions to find buyers...');
+        // Step 2: Extract unique signers/buyers from early txs
+        setProgress(30, 'Extracting early buyers...');
+        const uniqueBuyers = {};
+        const SKIP = new Set(['11111111111111111111111111111111', tokenMint]);
         
-        let buyerMap = {}; // wallet -> { firstBuyTime, txCount }
-        let parsedTxs = [];
-        let bSig = null;
-        
-        // Parse from enhanced API � get the token's transactions
-        // We'll fetch the earliest signers by going through sigs chronologically
-        // Use enhanced API on each unique signer to find who swapped this token
-        
-        // Actually, let's use a smarter approach: parse the signatures to find unique accounts
-        // Then check each one via enhanced API
-        
-        // Get unique accounts from earliest signatures
-        setProgress(20, 'Identifying early buyers...');
-        
-        // Process earliest sigs in parallel batches of 10
-        const earliestSigs = allSigs.slice(0, Math.min(200, allSigs.length));
-        const uniqueAccounts = {};
-        const SKIP_ADDRS = new Set([
-            '11111111111111111111111111111111',
-            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-            'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
-            'ComputeBudget111111111111111111111111111111',
-            'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-            tokenMint
-        ]);
-
-        for (let i = 0; i < earliestSigs.length; i += 10) {
-            const batch = earliestSigs.slice(i, i + 10);
-            const txResults = await Promise.all(batch.map(s =>
-                rpcCall('getTransaction', [s.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]).catch(() => null)
-            ));
-
-            for (const txResp of txResults) {
-                if (!txResp || !txResp.result) continue;
-                const accounts = txResp.result.transaction.message.accountKeys || [];
-                const blockTime = txResp.result.blockTime || 0;
-                for (const acc of accounts) {
-                    const addr = acc.pubkey || acc;
-                    if (typeof addr !== 'string' || addr.length < 32) continue;
-                    if (SKIP_ADDRS.has(addr)) continue;
-                    if (acc.signer === true && !uniqueAccounts[addr]) {
-                        uniqueAccounts[addr] = { firstSeen: blockTime, sig: txResp.result.transaction.signatures[0] };
-                    }
-                }
+        for (const tx of allTxs) {
+            if (tx.transactionError) continue;
+            // Fee payer is the signer
+            const fp = tx.feePayer;
+            if (!fp || SKIP.has(fp)) continue;
+            if (!uniqueBuyers[fp]) {
+                uniqueBuyers[fp] = { buyTime: tx.timestamp, sig: tx.signature };
             }
-
-            const pct = 20 + Math.floor((i / earliestSigs.length) * 30);
-            setProgress(pct, 'Parsing tx ' + Math.min(i + 10, earliestSigs.length) + '/' + earliestSigs.length + ' (10x parallel)');
-            await sleep(delayMs);
-            if (Object.keys(uniqueAccounts).length >= maxBuyers) break;
+            if (Object.keys(uniqueBuyers).length >= maxBuyers * 2) break;
         }
-        // Sort by first seen time
-        let buyers = Object.entries(uniqueAccounts)
-            .map(([addr, info]) => ({ address: addr, buyTime: info.firstSeen }))
+        
+        let buyers = Object.entries(uniqueBuyers)
+            .map(([addr, info]) => ({ address: addr, buyTime: info.buyTime }))
             .sort((a, b) => a.buyTime - b.buyTime)
             .slice(0, maxBuyers);
         
         log('Found ' + buyers.length + ' unique early signers');
-        setProgress(55, 'Classifying ' + buyers.length + ' wallets...');
+        setProgress(35, 'Classifying ' + buyers.length + ' wallets...');
         
-        // Step 3: Classify buyers in parallel batches
-        const PARALLEL = 5;
-        const tokenFirstSeen = allSigs[0] ? allSigs[0].blockTime : 0;
-        let classified = 0;
-
+        // Step 3: Batch classify - get balances for all wallets first via getMultipleAccounts
+        const BATCH_ACCT = 100;
+        const balanceMap = {};
+        for (let i = 0; i < buyers.length; i += BATCH_ACCT) {
+            const batch = buyers.slice(i, i + BATCH_ACCT).map(b => b.address);
+            try {
+                const resp = await rpcCall('getMultipleAccounts', [batch, { encoding: 'jsonParsed' }]);
+                if (resp.result && resp.result.value) {
+                    resp.result.value.forEach((acct, idx) => {
+                        const addr = batch[idx];
+                        if (!acct) { balanceMap[addr] = { sol: 0, exec: false, isToken: false }; return; }
+                        balanceMap[addr] = {
+                            sol: (acct.lamports || 0) / 1e9,
+                            exec: !!acct.executable,
+                            isToken: acct.data && acct.data.program === 'spl-token'
+                        };
+                    });
+                }
+            } catch(e) {}
+            await sleep(delayMs);
+        }
+        
+        setProgress(45, 'Filtering and classifying...');
+        
+        // Pre-filter: remove programs and token accounts
+        buyers = buyers.filter(b => {
+            const info = balanceMap[b.address];
+            if (!info) return true;
+            if (info.exec) { log(shortAddr(b.address) + ' -> program (skip)', 'skip'); return false; }
+            if (info.isToken) { log(shortAddr(b.address) + ' -> token account (skip)', 'skip'); return false; }
+            return true;
+        });
+        
+        log(buyers.length + ' wallets after pre-filter');
+        
+        // Step 4: Parallel classification (8 at a time)
+        const PARALLEL = 8;
+        const tokenFirstSeen = allTxs.length ? allTxs[0].timestamp : 0;
+        
         async function classifyOne(buyer) {
             const short = shortAddr(buyer.address);
+            const info = balanceMap[buyer.address] || { sol: 0 };
             try {
-                // Parallel: get account info + enhanced txs + total sigs at once
-                const [acctResp, txPage1, sigResp2] = await Promise.all([
-                    rpcCall('getAccountInfo', [buyer.address, { encoding: 'jsonParsed' }]),
-                    enhancedTxs(buyer.address, 100, null),
-                    rpcCall('getSignaturesForAddress', [buyer.address, { limit: 1000 }])
+                // Single enhanced API call (100 txs) + total sigs in parallel
+                const [txPage, sigResp] = await Promise.all([
+                    fetch('https://api-mainnet.helius-rpc.com/v0/addresses/' + buyer.address + '/transactions?api-key=' + apiKey + '&limit=100').then(r => r.ok ? r.json() : []).catch(() => []),
+                    rpcCall('getSignaturesForAddress', [buyer.address, { limit: 1000 }]).catch(() => ({ result: [] }))
                 ]);
-
-                const acctData = acctResp.result && acctResp.result.value;
-                if (acctData && acctData.executable) { log(short + ' -> program (skip)', 'skip'); return null; }
-                if (acctData && acctData.data && acctData.data.program === 'spl-token') { log(short + ' -> token account (skip)', 'skip'); return null; }
-
-                const solBalance = acctData ? (acctData.lamports || 0) / 1e9 : 0;
-                const txs = txPage1 || [];
-                const totalSigs = sigResp2.result ? sigResp2.result.length : 0;
-
-                if (txs.length === 0) { log(short + ' -> no txs (skip)', 'skip'); return null; }
-
-                let swapCount = 0, isFeePayer = 0;
+                
+                const totalSigs = sigResp.result ? sigResp.result.length : 0;
+                if (!txPage.length) { log(short + ' -> no txs (skip)', 'skip'); return null; }
+                
+                let swapCount = 0, feePayer = 0;
                 const interactors = {};
-                for (const tx of txs) {
+                for (const tx of txPage) {
                     if (/SWAP/.test(tx.type || '')) swapCount++;
-                    if (tx.feePayer === buyer.address) isFeePayer++;
+                    if (tx.feePayer === buyer.address) feePayer++;
                     if (tx.feePayer && tx.feePayer !== buyer.address) interactors[tx.feePayer] = true;
                 }
                 const uniqueCount = Object.keys(interactors).length;
-
+                
+                if (uniqueCount > 15 && feePayer === 0) { log(short + ' -> CEX/protocol (skip)', 'skip'); return null; }
+                if (totalSigs >= 1000 && feePayer === 0) { log(short + ' -> CEX (skip)', 'skip'); return null; }
+                
                 const tags = [];
-                const isTracked = trackedAddrs.has(buyer.address);
-                if (isTracked) tags.push('TRACKED');
-
-                if (uniqueCount > 15 && isFeePayer === 0) { log(short + ' -> CEX/protocol (skip)', 'skip'); return null; }
-                if (totalSigs >= 1000 && isFeePayer === 0) { log(short + ' -> CEX (skip)', 'skip'); return null; }
-
+                if (trackedAddrs.has(buyer.address)) tags.push('TRACKED');
                 if (tokenFirstSeen && buyer.buyTime && (buyer.buyTime - tokenFirstSeen) < 300) tags.push('EARLY');
-                if (solBalance > 500) tags.push('WHALE');
-                if (swapCount > 0 && isFeePayer > 0) tags.push('TRADER');
-                else if (swapCount > 0 && isFeePayer === 0) tags.push('PLATFORM');
-
-                const cls = tags.includes('EARLY') ? 'early' : 'ok';
-                log(short + ' -> ' + tags.join(', ') + ' (' + swapCount + ' swaps, ' + solBalance.toFixed(1) + ' SOL)', cls);
-
+                if (info.sol > 500) tags.push('WHALE');
+                if (swapCount > 0 && feePayer > 0) tags.push('TRADER');
+                else if (swapCount > 0 && feePayer === 0) tags.push('PLATFORM');
+                
+                log(short + ' -> ' + tags.join(', ') + ' (' + swapCount + ' swaps, ' + info.sol.toFixed(1) + ' SOL)', tags.includes('EARLY') ? 'early' : 'ok');
+                
                 return {
                     address: buyer.address,
                     buyTime: buyer.buyTime,
-                    solBalance: Math.round(solBalance * 100) / 100,
-                    swapCount,
-                    totalSigs,
-                    isFeePayer,
-                    tags,
-                    isTracked
+                    solBalance: Math.round(info.sol * 100) / 100,
+                    swapCount, totalSigs, isFeePayer: feePayer,
+                    tags, isTracked: tags.includes('TRACKED')
                 };
             } catch(e) {
                 log(short + ' -> error: ' + e.message, 'skip');
                 return null;
             }
         }
-
+        
         for (let i = 0; i < buyers.length; i += PARALLEL) {
             const batch = buyers.slice(i, i + PARALLEL);
-            const pct = 55 + Math.floor((i / buyers.length) * 40);
-            setProgress(pct, 'Classifying ' + Math.min(i + PARALLEL, buyers.length) + '/' + buyers.length + ' (5x parallel)');
+            const pct = 45 + Math.floor((i / buyers.length) * 50);
+            setProgress(pct, 'Classifying ' + Math.min(i + PARALLEL, buyers.length) + '/' + buyers.length + ' (8x parallel)');
             const batchResults = await Promise.all(batch.map(b => classifyOne(b)));
             for (const r of batchResults) { if (r) results.push(r); }
-            classified += batch.length;
-            if (i + PARALLEL < buyers.length) await sleep(delayMs);
+            await sleep(delayMs);
         }
         
-        setProgress(100, 'Done! Found ' + results.length + ' wallet buyers');
+        setProgress(100, 'Done! Found ' + results.length + ' wallets');
         
-        // Show results
         document.getElementById('resultsSection').style.display = 'block';
         document.getElementById('resultsTable').style.display = 'table';
         document.getElementById('actionsBar').style.display = 'flex';
+        renderTable();
         
+        // Summary
         const earlyCount = results.filter(r => r.tags.includes('EARLY')).length;
         const trackedCount = results.filter(r => r.isTracked).length;
         const whaleCount = results.filter(r => r.tags.includes('WHALE')).length;
-        
-        document.getElementById('summaryBar').innerHTML =
-            '<div class="summary-stat"><div class="num">' + results.length + '</div><div class="label">Buyers found</div></div>' +
+        document.getElementById('summaryCards').innerHTML = 
+            '<div class="summary-stat"><div class="num">' + results.length + '</div><div class="label">Total found</div></div>' +
             '<div class="summary-stat"><div class="num yellow">' + earlyCount + '</div><div class="label">Early buyers</div></div>' +
             '<div class="summary-stat"><div class="num green">' + trackedCount + '</div><div class="label">Already tracked</div></div>' +
             '<div class="summary-stat"><div class="num">' + whaleCount + '</div><div class="label">Whales (500+ SOL)</div></div>';
-        
-        renderTable();
-        
-        // Save results
-        localStorage.setItem('tokenscan_results', JSON.stringify({ token: tokenMint, results }));
-        
     } catch(e) {
-        log('Fatal error: ' + e.message);
-        setProgress(0, 'Error: ' + e.message);
+        log('Error: ' + e.message, 'skip');
     }
     
     isRunning = false;
     document.getElementById('scanBtn').disabled = false;
 }
 
-function renderTable() {
-    results.sort((a, b) => {
-        let av = a[currentSort.key] || 0, bv = b[currentSort.key] || 0;
-        if (typeof av === 'number') return (av - bv) * currentSort.dir;
-        return String(av).localeCompare(String(bv)) * currentSort.dir;
-    });
-    
-    document.getElementById('tbody').innerHTML = results.map(w => {
-        const tagsHtml = w.tags.map(t => {
-            const cls = t === 'EARLY' ? 'early' : t === 'TRACKED' ? 'tracked' : t === 'WHALE' ? 'whale' : 'tracked';
-            return '<span class="badge ' + cls + '">' + t + '</span> ';
-        }).join('');
-        
-        const buyTimeStr = w.buyTime ? new Date(w.buyTime * 1000).toLocaleString() : 'Unknown';
-        const ago = timeAgo(w.buyTime);
-        
-        return '<tr>' +
-            '<td><input type="checkbox" class="checkbox" data-addr="' + w.address + '" onchange="updateCount()"></td>' +
-            '<td><div style="font-size:12px;">' + buyTimeStr + '</div><div class="time-ago">' + ago + '</div></td>' +
-            '<td class="addr"><a href="https://solscan.io/account/' + w.address + '" target="_blank" title="' + w.address + '">' + shortAddr(w.address) + '</a> <span class="copy-btn" onclick="copyAddr(\'' + w.address + '\')">[c]</span></td>' +
-            '<td class="sol-bal' + ((w.solBalance || 0) > 0 ? '' : ' zero') + '">' + (w.solBalance || 0).toFixed(2) + '</td>' +
-            '<td>' + (w.swapCount || 0) + '</td>' +
-            '<td>' + (w.totalSigs || 0) + '</td>' +
-            '<td>' + tagsHtml + '</td>' +
-            '<td class="links"><a href="profile.html?wallet=' + w.address + '" target="_blank" class="solscan" style="background:#f59e0b22;color:#f59e0b;">Profile</a> <a href="https://solscan.io/account/' + w.address + '" target="_blank" class="solscan">Solscan</a> <a href="https://birdeye.so/profile/' + w.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a></td>' +
-            '</tr>';
-    }).join('');
-}
-
-document.querySelectorAll('th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        if (currentSort.key === key) currentSort.dir *= -1;
-        else { currentSort.key = key; currentSort.dir = 1; }
-        document.querySelectorAll('th').forEach(t => t.classList.remove('sorted'));
-        th.classList.add('sorted');
-        renderTable();
-    });
-});
-
-function toggleAll(el) { document.querySelectorAll('#tbody .checkbox').forEach(cb => { cb.checked = el.checked; }); updateCount(); }
-function updateCount() { document.getElementById('selectedCount').textContent = document.querySelectorAll('#tbody .checkbox:checked').length + ' selected'; }
-
-function exportSelected() {
-    const selected = [];
-    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => {
-        const addr = cb.dataset.addr;
-        const w = results.find(r => r.address === addr);
-        if (w) selected.push(w);
-    });
-    if (!selected.length) return showToast('Nothing selected');
-    const json = JSON.stringify(selected, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'token_buyers.json'; a.click();
-    showToast(selected.length + ' wallets exported');
-}
 
 function copySelected() {
     const addrs = [];
