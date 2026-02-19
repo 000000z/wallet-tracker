@@ -302,7 +302,7 @@ function renderResults() {
         const countClass = t.buyerCount >= 4 ? 'hot' : t.buyerCount >= 3 ? 'warm' : 'mild';
         const shortMint = t.mint.slice(0, 6) + '...' + t.mint.slice(-4);
         
-        // Group details by wallet — get EARLIEST buy and latest action
+        // Group details by wallet ï¿½ get EARLIEST buy and latest action
         const walletActions = {};
         const walletFirstBuy = {};
         for (const d of t.details) {
@@ -319,7 +319,7 @@ function renderResults() {
             const detail = walletActions[w];
             const actionClass = detail && detail.action === 'SELL' ? 'action sell' : 'action';
             const actionText = detail ? detail.action : '?';
-            return '<span class="buyer-tag"><a href="https://solscan.io/account/' + w + '" target="_blank">' + short + '</a> <span class="' + actionClass + '">' + actionText + '</span></span>';
+            return '<span class="buyer-tag"><a href="profile.html?wallet=' + w + '" target="_blank" title="Open Profile">' + short + '</a> <span class="' + actionClass + '">' + actionText + '</span></span>';
         }).join('');
         
         const timeStr = t.latestTimestamp ? new Date(t.latestTimestamp * 1000).toLocaleString() : 'Unknown';
@@ -367,12 +367,12 @@ function renderResults() {
                     '<span style="color:#666;font-size:11px;min-width:70px;">' + dateStr + '</span>' +
                     '<span style="color:#e0e0e0;font-size:12px;min-width:90px;">' + timeStr2 + '</span>' +
                     '<span style="min-width:60px;font-size:11px;' + (diff <= 15 && diff > 0 ? 'color:#ef4444;font-weight:600;' : 'color:#666;') + '">' + diffStr + '</span>' +
-                    '<a href="https://solscan.io/account/' + e.wallet + '" target="_blank" style="color:#7dd3fc;text-decoration:none;font-size:12px;">' + e.short + '</a>' +
+                    '<a href="profile.html?wallet=' + e.wallet + '" target="_blank" style="color:#7dd3fc;text-decoration:none;font-size:12px;">' + e.short + '</a>' +
                     clusterTag +
                 '</div>';
             }).join('');
             timingHtml = '<div id="' + cardId + '" style="display:none;margin-top:10px;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:6px;padding:10px;">' +
-                '<div style="font-size:11px;color:#666;margin-bottom:6px;">Buy timing (earliest first) — <span style="color:#ef4444;">red = within 15s</span></div>' +
+                '<div style="font-size:11px;color:#666;margin-bottom:6px;">Buy timing (earliest first) ï¿½ <span style="color:#ef4444;">red = within 15s</span></div>' +
                 rows +
             '</div>';
         }

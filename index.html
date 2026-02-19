@@ -4582,7 +4582,7 @@ function render() {
             '<td class="swap-count' + swapClass + '">' + (w.swapCount || 0) + '</td>' +
             '<td>' + (w.totalSigs || 0) + '</td>' +
             '<td style="font-size:11px;color:#666;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (w.reason || '') + '">' + (w.reason || '') + '</td>' +
-            '<td class="links"><a href="https://solscan.io/account/' + w.address + '" target="_blank" class="solscan">Solscan</a> <a href="https://birdeye.so/profile/' + w.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a></td>' +
+            '<td class="links"><a href="profile.html?wallet=' + w.address + '" target="_blank" class="solscan" style="background:#f59e0b22;color:#f59e0b;">Profile</a> <a href="https://solscan.io/account/' + w.address + '" target="_blank" class="solscan">Solscan</a> <a href="https://birdeye.so/profile/' + w.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a></td>' +
             '<td style="text-align:center">' + (status === 'approved' ? 'YES' : status === 'rejected' ? 'NO' : '--') + '</td></tr>';
     }).join('');
     
