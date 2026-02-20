@@ -288,37 +288,74 @@ function saveRecap() {
     loadPastRecaps();
 }
 
-function loadRecap() {
+async function loadRecap() {
     const raw = localStorage.getItem(RECAP_PREFIX + currentDate);
     if (raw) {
+        // User has saved edits — use those
         recapData = JSON.parse(raw);
-    } else {
-        recapData = { briefRecap: '', tokens: [] };
+        document.getElementById('briefText').value = recapData.briefRecap || '';
+        dirty = false;
+        renderTokens();
+        return;
     }
-    document.getElementById('briefText').value = recapData.briefRecap || '';
+
+    // Try loading auto-generated recap from GitHub Actions
+    recapData = { briefRecap: '', tokens: [] };
+    try {
+        const resp = await window.fetch('data/recaps/' + currentDate + '.json');
+        if (resp.ok) {
+            const autoData = await resp.json();
+            recapData.briefRecap = autoData.briefRecap || '';
+            recapData.tokens = autoData.tokens || [];
+            document.getElementById('briefText').value = recapData.briefRecap;
+            dirty = false;
+            renderTokens();
+            showToast('Loaded auto-generated recap for ' + currentDate);
+            return;
+        }
+    } catch(e) {}
+
+    // Nothing found
+    document.getElementById('briefText').value = '';
     dirty = false;
     renderTokens();
 }
 
-function loadPastRecaps() {
+async function loadPastRecaps() {
     const list = document.getElementById('pastList');
-    const keys = [];
+    const recapMap = {};
+
+    // Gather locally saved recaps
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k.startsWith(RECAP_PREFIX)) {
             const date = k.replace(RECAP_PREFIX, '');
             try {
                 const data = JSON.parse(localStorage.getItem(k));
-                keys.push({ date, count: (data.tokens || []).length });
+                recapMap[date] = { date, count: (data.tokens || []).length, source: 'local' };
             } catch(e) {}
         }
     }
-    keys.sort((a, b) => b.date.localeCompare(a.date));
+
+    // Merge with auto-generated index from GitHub Actions
+    try {
+        const resp = await window.fetch('data/recaps/index.json');
+        if (resp.ok) {
+            const index = await resp.json();
+            for (const entry of index) {
+                if (!recapMap[entry.date]) {
+                    recapMap[entry.date] = { date: entry.date, count: entry.tokenCount || 0, source: 'auto' };
+                }
+            }
+        }
+    } catch(e) {}
+
+    const keys = Object.values(recapMap).sort((a, b) => b.date.localeCompare(a.date));
     list.innerHTML = keys.length === 0
         ? '<span style="color:#333;font-size:12px">No saved recaps yet</span>'
         : keys.map(k =>
             '<div class="past-chip' + (k.date === currentDate ? ' active' : '') + '" onclick="loadDate(\'' + k.date + '\')">' +
-            k.date + '<span class="chip-count">(' + k.count + ')</span></div>'
+            k.date + '<span class="chip-count">(' + k.count + (k.source === 'auto' ? ' auto' : '') + ')</span></div>'
         ).join('');
 }
 
