@@ -424,6 +424,136 @@ td a:hover { text-decoration: underline; }
 .green { color: #22c55e; }
 .red { color: #ef4444; }
 .yellow { color: #f59e0b; }
+
+/* Twitter Intel */
+.twitter-intel-section {
+    margin-top: 14px;
+}
+.twitter-intel-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d9bf0;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tweet-card {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    color: inherit;
+}
+.tweet-card:hover { border-color: #1d9bf044; }
+.tweet-author {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.tweet-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+.tweet-author-info { flex: 1; min-width: 0; }
+.tweet-author-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tweet-author-handle {
+    font-size: 11px;
+    color: #555;
+}
+.tweet-author-followers {
+    font-size: 10px;
+    color: #444;
+    white-space: nowrap;
+}
+.tweet-text {
+    font-size: 12px;
+    color: #ccc;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    word-break: break-word;
+}
+.tweet-metrics {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: #555;
+}
+.tweet-metric {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.tweet-metric .heart { color: #ef4444; }
+.tweet-metric .rt { color: #22c55e; }
+.tweet-metric .reply { color: #1d9bf0; }
+.tweet-time {
+    font-size: 10px;
+    color: #444;
+    margin-left: auto;
+}
+.accounts-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+.account-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s;
+    max-width: 220px;
+}
+.account-chip:hover { border-color: #1d9bf044; }
+.account-chip img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+.account-chip-info { min-width: 0; }
+.account-chip-name {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.account-chip-meta {
+    font-size: 10px;
+    color: #555;
+}
+.twitter-fallback-note {
+    font-size: 11px;
+    color: #555;
+    margin-top: 6px;
+    font-style: italic;
+}
 </style>
 <link rel="stylesheet" href="shared.css">
 </head>
@@ -736,6 +866,8 @@ function renderHolders(full) {
     el.innerHTML = html;
 }
 
+const WORKER_URL = 'https://chillzmonitor.zinabiadnan.workers.dev';
+
 function renderSocial(dex) {
     const el = document.getElementById('socialContent');
     const info = dex ? (dex.info || {}) : {};
@@ -772,8 +904,13 @@ function renderSocial(dex) {
         html += '<div style="font-size:12px;color:#f59e0b;margin-bottom:10px;">No official socials linked on DexScreener</div>';
     }
 
-    // Twitter search buttons (always show)
-    html += '<div class="search-subtitle">Search Twitter</div>';
+    // Twitter Intel section — auto-populated
+    html += '<div class="twitter-intel-section" id="twitterIntel">';
+    html += '<div class="twitter-intel-header"><span class="spinner"></span> Scanning Twitter...</div>';
+    html += '</div>';
+
+    // Manual search fallback (shown below, always available)
+    html += '<div class="search-subtitle" style="margin-top:14px;">Manual Twitter Search</div>';
     html += '<div class="twitter-searches">';
     html += '<a href="https://x.com/search?q=' + encodeURIComponent(currentMint) + '&f=live" target="_blank" class="twitter-search-btn">Search CA</a>';
     html += '<a href="https://x.com/search?q=' + encodeURIComponent('$' + symbol) + '&f=live" target="_blank" class="twitter-search-btn">Search $' + symbol + '</a>';
@@ -781,6 +918,124 @@ function renderSocial(dex) {
         html += '<a href="https://x.com/search?q=' + encodeURIComponent('"' + name + '"') + '&f=live" target="_blank" class="twitter-search-btn">Search "' + name + '"</a>';
     }
     html += '</div>';
+
+    el.innerHTML = html;
+
+    // Fire Twitter intel fetch
+    fetchTwitterIntel(currentMint, symbol, name);
+}
+
+function formatTweetTime(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        const diff = Date.now() - d.getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 60) return mins + 'm ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + 'h ago';
+        const days = Math.floor(hrs / 24);
+        if (days < 30) return days + 'd ago';
+        return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    } catch { return ''; }
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatFollowers(n) {
+    if (!n) return '0';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return String(n);
+}
+
+async function fetchTwitterIntel(mint, symbol, name) {
+    const el = document.getElementById('twitterIntel');
+    if (!el) return;
+
+    try {
+        const resp = await fetch(WORKER_URL + '/api/twitter-search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mint, symbol, name }),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            if (resp.status === 503) {
+                // No API key configured — hide section silently
+                el.innerHTML = '<div class="twitter-fallback-note">Twitter auto-scan not configured (no API key). Use manual search below.</div>';
+                return;
+            }
+            throw new Error(err.error || 'Worker returned ' + resp.status);
+        }
+
+        const data = await resp.json();
+        renderTwitterIntel(el, data);
+
+    } catch (e) {
+        el.innerHTML = '<div class="twitter-fallback-note">Twitter auto-scan unavailable: ' + escapeHtml(e.message) + '. Use manual search below.</div>';
+    }
+}
+
+function renderTwitterIntel(el, data) {
+    const { tweets, accounts } = data;
+    let html = '';
+
+    // Related Tweets
+    html += '<div class="twitter-intel-header">Related Tweets (' + tweets.length + ')</div>';
+
+    if (tweets.length === 0) {
+        html += '<div style="font-size:12px;color:#555;margin-bottom:12px;">No tweets found for this token.</div>';
+    } else {
+        for (const t of tweets) {
+            const u = t.user;
+            const tweetUrl = 'https://x.com/' + u.screen_name + '/status/' + t.id;
+            const text = t.text.length > 300 ? t.text.slice(0, 297) + '...' : t.text;
+            const avatarHtml = u.profile_image_url
+                ? '<img class="tweet-avatar" src="' + escapeHtml(u.profile_image_url) + '" onerror="this.style.display=\'none\'">'
+                : '<div class="tweet-avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#7dd3fc;">' + (u.name ? u.name.charAt(0).toUpperCase() : '?') + '</div>';
+
+            html += '<a class="tweet-card" href="' + tweetUrl + '" target="_blank">';
+            html += '<div class="tweet-author">';
+            html += avatarHtml;
+            html += '<div class="tweet-author-info">';
+            html += '<div class="tweet-author-name">' + escapeHtml(u.name) + (u.verified ? ' &#10003;' : '') + '</div>';
+            html += '<div class="tweet-author-handle">@' + escapeHtml(u.screen_name) + '</div>';
+            html += '</div>';
+            html += '<div class="tweet-author-followers">' + formatFollowers(u.followers_count) + ' followers</div>';
+            html += '</div>';
+            html += '<div class="tweet-text">' + escapeHtml(text) + '</div>';
+            html += '<div class="tweet-metrics">';
+            html += '<span class="tweet-metric"><span class="heart">&#9829;</span> ' + t.favorite_count + '</span>';
+            html += '<span class="tweet-metric"><span class="rt">&#8635;</span> ' + t.retweet_count + '</span>';
+            html += '<span class="tweet-metric"><span class="reply">&#8617;</span> ' + (t.reply_count || 0) + '</span>';
+            html += '<span class="tweet-time">' + formatTweetTime(t.created_at) + '</span>';
+            html += '</div>';
+            html += '</a>';
+        }
+    }
+
+    // Related Accounts
+    if (accounts && accounts.length > 0) {
+        html += '<div class="twitter-intel-header" style="margin-top:16px;">Related Accounts (' + accounts.length + ')</div>';
+        html += '<div class="accounts-grid">';
+        for (const a of accounts) {
+            const profileUrl = 'https://x.com/' + a.screen_name;
+            const avatarHtml = a.profile_image_url
+                ? '<img src="' + escapeHtml(a.profile_image_url) + '" onerror="this.style.display=\'none\'">'
+                : '';
+            html += '<a class="account-chip" href="' + profileUrl + '" target="_blank">';
+            html += avatarHtml;
+            html += '<div class="account-chip-info">';
+            html += '<div class="account-chip-name">@' + escapeHtml(a.screen_name) + '</div>';
+            html += '<div class="account-chip-meta">' + formatFollowers(a.followers_count) + ' followers &middot; ' + a.tweet_count_in_results + ' tweet' + (a.tweet_count_in_results !== 1 ? 's' : '') + '</div>';
+            html += '</div></a>';
+        }
+        html += '</div>';
+    }
 
     el.innerHTML = html;
 }
