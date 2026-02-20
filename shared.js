@@ -56,6 +56,7 @@ function injectLayout() {
         { href: 'token-scanner.html', label: 'Token Scanner', icon: 'T' },
         { href: 'overlap.html', label: 'Overlap', icon: 'O' },
         { href: 'power-traders.html', label: 'Power Traders', icon: 'W' },
+        { href: 'recap.html', label: 'Daily Recap', icon: 'R' },
         { href: 'profile.html', label: 'Profile', icon: 'P' },
     ];
     

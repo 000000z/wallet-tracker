@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Recap - Chillz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+
+.header { background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.header h1 { font-size: 18px; color: #7dd3fc; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.date-nav { display: flex; align-items: center; gap: 8px; background: #12121a; border-bottom: 1px solid #1e1e2e; padding: 12px 24px; }
+.date-nav button { background: #1a1a2e; border: 1px solid #2a2a3e; color: #999; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.date-nav button:hover { border-color: #7dd3fc; color: #7dd3fc; }
+.date-input { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 6px 12px; border-radius: 6px; font-family: inherit; font-size: 13px; }
+.date-label { color: #7dd3fc; font-size: 16px; font-weight: 700; }
+.date-weekday { color: #666; font-size: 12px; margin-left: 8px; }
+.saved-indicator { color: #22c55e; font-size: 11px; margin-left: auto; display: none; }
+.saved-indicator.show { display: inline; }
+
+.btn { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-family: inherit; border: 1px solid; transition: all 0.15s; }
+.btn-primary { background: #7dd3fc22; border-color: #7dd3fc44; color: #7dd3fc; }
+.btn-primary:hover { background: #7dd3fc33; }
+.btn-green { background: #22c55e22; border-color: #22c55e44; color: #22c55e; }
+.btn-green:hover { background: #22c55e33; }
+.btn-red { background: #ef444422; border-color: #ef444444; color: #ef4444; }
+.btn-red:hover { background: #ef444433; }
+.btn-export { background: #8b5cf622; border-color: #8b5cf644; color: #8b5cf6; }
+.btn-export:hover { background: #8b5cf633; }
+.btn-orange { background: #f59e0b22; border-color: #f59e0b44; color: #f59e0b; }
+.btn-orange:hover { background: #f59e0b33; }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* Brief Recap Section */
+.recap-section { padding: 20px 24px; }
+.section-title { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.section-title .count { color: #7dd3fc; font-weight: 700; }
+
+.brief-wrap { background: #12121a; border: 1px solid #1e1e2e; border-radius: 10px; padding: 16px; }
+.brief-textarea { width: 100%; min-height: 120px; background: transparent; border: none; color: #e0e0e0; font-family: inherit; font-size: 13px; line-height: 1.7; resize: vertical; outline: none; }
+.brief-textarea::placeholder { color: #333; }
+.brief-hint { color: #333; font-size: 11px; margin-top: 8px; }
+
+/* Token Controls */
+.token-controls { padding: 0 24px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.token-controls input { background: #1a1a2e; border: 1px solid #2a2a3e; color: #e0e0e0; padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 12px; width: 380px; }
+.token-controls input::placeholder { color: #444; }
+
+/* Summary Stats */
+.summary-row { display: flex; gap: 10px; padding: 0 24px 16px; flex-wrap: wrap; }
+.summary-pill { background: #1a1a2e; border: 1px solid #2a2a3e; padding: 6px 14px; border-radius: 20px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+.summary-pill .val { font-weight: 700; }
+.summary-pill .val.green { color: #22c55e; }
+.summary-pill .val.red { color: #ef4444; }
+.summary-pill .val.blue { color: #7dd3fc; }
+.summary-pill .val.yellow { color: #f59e0b; }
+
+/* Token Cards */
+.tokens-grid { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+
+.token-card { background: #12121a; border: 1px solid #1e1e2e; border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+.token-card:hover { border-color: #2a2a3e; }
+.token-card.fast { border-left: 3px solid #ef4444; }
+.token-card.slow { border-left: 3px solid #22c55e; }
+.token-card.mid { border-left: 3px solid #f59e0b; }
+.token-card.rug { border-left: 3px solid #666; }
+
+.card-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px 0; }
+.card-symbol { font-size: 16px; font-weight: 700; color: #e0e0e0; }
+.card-name { color: #666; font-size: 12px; }
+.card-cook { padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-left: auto; cursor: pointer; }
+.card-cook.fast { background: #ef444422; color: #ef4444; border: 1px solid #ef444433; }
+.card-cook.slow { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e33; }
+.card-cook.mid { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b33; }
+.card-cook.rug { background: #66666622; color: #666; border: 1px solid #66666633; }
+.card-actions { display: flex; gap: 4px; margin-left: 8px; }
+.card-action { background: none; border: none; color: #444; cursor: pointer; font-size: 14px; padding: 2px 4px; }
+.card-action:hover { color: #ef4444; }
+
+.card-stats { display: flex; gap: 16px; padding: 10px 16px; flex-wrap: wrap; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 13px; font-weight: 600; }
+.stat-value.green { color: #22c55e; }
+.stat-value.red { color: #ef4444; }
+.stat-value.blue { color: #7dd3fc; }
+.stat-value.yellow { color: #f59e0b; }
+.stat-value.gray { color: #666; }
+
+.card-desc { padding: 0 16px 12px; }
+.card-desc textarea { width: 100%; min-height: 40px; background: #0d0d14; border: 1px solid #1a1a2e; color: #ccc; font-family: inherit; font-size: 12px; line-height: 1.6; padding: 8px 10px; border-radius: 6px; resize: vertical; outline: none; }
+.card-desc textarea::placeholder { color: #333; }
+.card-desc textarea:focus { border-color: #2a2a3e; }
+
+.card-tags { display: flex; gap: 4px; padding: 0 16px 10px; flex-wrap: wrap; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.tag.locked { background: #22c55e22; color: #22c55e; }
+.tag.dev { background: #8b5cf622; color: #8b5cf6; }
+.tag.viral { background: #ef444422; color: #ef4444; }
+.tag.ai { background: #7dd3fc22; color: #7dd3fc; }
+.tag.custom { background: #f59e0b22; color: #f59e0b; }
+
+.card-links { display: flex; gap: 4px; padding: 0 16px 12px; }
+.card-links a { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; text-decoration: none; }
+.card-links .ds { background: #22c55e22; color: #22c55e; }
+.card-links .ds:hover { background: #22c55e44; }
+.card-links .profile { background: #f59e0b22; color: #f59e0b; }
+.card-links .profile:hover { background: #f59e0b44; }
+.card-links .solscan { background: #3b82f622; color: #3b82f6; }
+.card-links .solscan:hover { background: #3b82f644; }
+.card-links .birdeye { background: #8b5cf622; color: #8b5cf6; }
+.card-links .birdeye:hover { background: #8b5cf644; }
+
+/* Past Recaps Browser */
+.past-recaps { padding: 20px 24px; border-top: 1px solid #1e1e2e; }
+.past-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.past-chip { background: #1a1a2e; border: 1px solid #2a2a3e; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; color: #999; transition: all 0.15s; }
+.past-chip:hover { border-color: #7dd3fc; color: #7dd3fc; }
+.past-chip.active { border-color: #7dd3fc; color: #7dd3fc; background: #7dd3fc11; }
+.past-chip .chip-count { color: #555; font-size: 10px; margin-left: 4px; }
+
+.empty-state { text-align: center; padding: 60px 24px; color: #333; }
+.empty-state h2 { font-size: 16px; color: #444; margin-bottom: 8px; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: #000; padding: 10px 20px; border-radius: 8px; font-size: 12px; display: none; z-index: 1000; font-weight: 600; }
+
+/* Drag handle */
+.drag-handle { cursor: grab; color: #333; font-size: 16px; padding: 0 4px; user-select: none; }
+.drag-handle:hover { color: #666; }
+.token-card.dragging { opacity: 0.5; border-color: #7dd3fc; }
+
+/* Progress */
+.scan-progress { padding: 0 24px 12px; display: none; }
+.scan-bar { background: #1a1a2e; border-radius: 6px; height: 6px; overflow: hidden; }
+.scan-fill { background: #7dd3fc; height: 100%; width: 0%; transition: width 0.3s; }
+.scan-text { color: #555; font-size: 11px; margin-top: 4px; }
+
+@media (max-width: 768px) {
+    .card-stats { gap: 10px; }
+    .token-controls input { width: 100%; }
+}
+</style>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<div class="header">
+    <h1>Daily Recap</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="scanTrending()">Scan Trending</button>
+        <button class="btn btn-green" onclick="saveRecap()">Save</button>
+        <button class="btn btn-export" onclick="exportRecap()">Export</button>
+    </div>
+</div>
+
+<div class="date-nav">
+    <button onclick="changeDate(-1)">&larr; Prev</button>
+    <input type="date" class="date-input" id="dateInput" onchange="loadDate(this.value)">
+    <button onclick="changeDate(1)">Next &rarr;</button>
+    <span class="date-label" id="dateLabel"></span>
+    <span class="date-weekday" id="dateWeekday"></span>
+    <span class="saved-indicator" id="savedIndicator">Saved</span>
+</div>
+
+<div class="scan-progress" id="scanProgress">
+    <div class="scan-bar"><div class="scan-fill" id="scanFill"></div></div>
+    <div class="scan-text" id="scanText">Scanning...</div>
+</div>
+
+<div class="recap-section">
+    <div class="section-title">Brief Recap</div>
+    <div class="brief-wrap">
+        <textarea class="brief-textarea" id="briefText" placeholder="Write today's trenches recap here...&#10;&#10;What dominated the timeline? Major narratives? Market sentiment? Notable events?"></textarea>
+        <div class="brief-hint">Tip: Write the overall market vibe, major narratives, and notable events</div>
+    </div>
+</div>
+
+<div class="summary-row" id="summaryRow" style="display:none"></div>
+
+<div class="recap-section" style="padding-bottom: 8px;">
+    <div class="section-title">Token Highlights <span class="count" id="tokenCountLabel">0</span></div>
+</div>
+
+<div class="token-controls">
+    <input type="text" id="addTokenInput" placeholder="Paste token CA to add, or type symbol to search...">
+    <button class="btn btn-primary btn-sm" onclick="addTokenByMint()">Add Token</button>
+    <button class="btn btn-orange btn-sm" onclick="addManualToken()">Add Manual</button>
+</div>
+
+<div class="tokens-grid" id="tokensGrid"></div>
+
+<div class="empty-state" id="emptyState">
+    <h2>No tokens yet</h2>
+    <p>Click "Scan Trending" to auto-pull today's hot tokens, or add them manually.</p>
+</div>
+
+<div class="past-recaps">
+    <div class="section-title">Past Recaps</div>
+    <div class="past-list" id="pastList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== STATE ==========
+let currentDate = '';
+let recapData = { briefRecap: '', tokens: [] };
+let dirty = false;
+
+const COOK_TYPES = ['fast', 'slow', 'mid', 'rug'];
+const COOK_LABELS = { fast: 'Fast Cook', slow: 'Slow Cook', mid: 'Mid Cook', rug: 'Rug' };
+const RECAP_PREFIX = 'recap_';
+
+// ========== API ==========
+function getApiKey() {
+    let key = localStorage.getItem('helius_api_key');
+    if (!key) { key = prompt('Enter your Helius API key:'); if (key) localStorage.setItem('helius_api_key', key); }
+    return key;
+}
+
+// ========== DATE MANAGEMENT ==========
+function formatDate(d) {
+    return d.toISOString().split('T')[0];
+}
+
+function getYesterday() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return formatDate(d);
+}
+
+function initDate() {
+    const params = new URLSearchParams(location.search);
+    currentDate = params.get('date') || getYesterday();
+    document.getElementById('dateInput').value = currentDate;
+    updateDateDisplay();
+    loadRecap();
+    loadPastRecaps();
+}
+
+function updateDateDisplay() {
+    const d = new Date(currentDate + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    document.getElementById('dateLabel').textContent = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+    document.getElementById('dateWeekday').textContent = days[d.getDay()];
+}
+
+function changeDate(delta) {
+    if (dirty) saveRecap();
+    const d = new Date(currentDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    currentDate = formatDate(d);
+    document.getElementById('dateInput').value = currentDate;
+    updateDateDisplay();
+    loadRecap();
+    history.replaceState(null, '', '?date=' + currentDate);
+}
+
+function loadDate(val) {
+    if (dirty) saveRecap();
+    currentDate = val;
+    updateDateDisplay();
+    loadRecap();
+    history.replaceState(null, '', '?date=' + currentDate);
+}
+
+// ========== SAVE / LOAD ==========
+function saveRecap() {
+    recapData.briefRecap = document.getElementById('briefText').value;
+    // Collect token descriptions from textareas
+    document.querySelectorAll('.token-card').forEach((card, i) => {
+        if (recapData.tokens[i]) {
+            const ta = card.querySelector('.card-desc textarea');
+            if (ta) recapData.tokens[i].description = ta.value;
+        }
+    });
+    recapData.savedAt = Date.now();
+    localStorage.setItem(RECAP_PREFIX + currentDate, JSON.stringify(recapData));
+    dirty = false;
+    const ind = document.getElementById('savedIndicator');
+    ind.classList.add('show');
+    setTimeout(() => ind.classList.remove('show'), 2000);
+    showToast('Recap saved');
+    loadPastRecaps();
+}
+
+function loadRecap() {
+    const raw = localStorage.getItem(RECAP_PREFIX + currentDate);
+    if (raw) {
+        recapData = JSON.parse(raw);
+    } else {
+        recapData = { briefRecap: '', tokens: [] };
+    }
+    document.getElementById('briefText').value = recapData.briefRecap || '';
+    dirty = false;
+    renderTokens();
+}
+
+function loadPastRecaps() {
+    const list = document.getElementById('pastList');
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k.startsWith(RECAP_PREFIX)) {
+            const date = k.replace(RECAP_PREFIX, '');
+            try {
+                const data = JSON.parse(localStorage.getItem(k));
+                keys.push({ date, count: (data.tokens || []).length });
+            } catch(e) {}
+        }
+    }
+    keys.sort((a, b) => b.date.localeCompare(a.date));
+    list.innerHTML = keys.length === 0
+        ? '<span style="color:#333;font-size:12px">No saved recaps yet</span>'
+        : keys.map(k =>
+            '<div class="past-chip' + (k.date === currentDate ? ' active' : '') + '" onclick="loadDate(\'' + k.date + '\')">' +
+            k.date + '<span class="chip-count">(' + k.count + ')</span></div>'
+        ).join('');
+}
+
+// ========== SCAN TRENDING ==========
+async function scanTrending() {
+    const prog = document.getElementById('scanProgress');
+    const fill = document.getElementById('scanFill');
+    const text = document.getElementById('scanText');
+    prog.style.display = 'block';
+    fill.style.width = '5%';
+    text.textContent = 'Fetching trending tokens from DexScreener...';
+
+    try {
+        // Phase 1: Get boosted tokens
+        const boostResp = await fetch('https://api.dexscreener.com/token-boosts/top/v1');
+        if (!boostResp.ok) throw new Error('DexScreener returned ' + boostResp.status);
+        const boostData = await boostResp.json();
+
+        const seen = new Set();
+        const solanaMints = [];
+        for (const item of boostData) {
+            if (item.chainId === 'solana' && item.tokenAddress && !seen.has(item.tokenAddress)) {
+                seen.add(item.tokenAddress);
+                solanaMints.push(item.tokenAddress);
+            }
+        }
+
+        fill.style.width = '30%';
+        text.textContent = 'Found ' + solanaMints.length + ' Solana tokens, fetching details...';
+
+        // Phase 2: Get token details in batches
+        const allTokens = [];
+        const batchSize = 30;
+        for (let i = 0; i < solanaMints.length; i += batchSize) {
+            const batch = solanaMints.slice(i, i + batchSize);
+            try {
+                const resp = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + batch.join(','));
+                if (resp.ok) {
+                    const pairs = await resp.json();
+                    const byToken = {};
+                    for (const p of pairs) {
+                        const addr = p.baseToken?.address;
+                        if (!addr) continue;
+                        const vol = p.volume?.h24 || 0;
+                        if (!byToken[addr] || vol > byToken[addr].volume24h) {
+                            byToken[addr] = {
+                                mint: addr,
+                                symbol: p.baseToken?.symbol || '???',
+                                name: p.baseToken?.name || '',
+                                volume24h: vol,
+                                priceUsd: parseFloat(p.priceUsd) || 0,
+                                fdv: p.fdv || 0,
+                                marketCap: p.marketCap || p.fdv || 0,
+                                priceChange24h: p.priceChange?.h24 || 0,
+                                priceChange6h: p.priceChange?.h6 || 0,
+                                priceChange1h: p.priceChange?.h1 || 0,
+                                liquidity: p.liquidity?.usd || 0,
+                                pairAddress: p.pairAddress || '',
+                                pairCreatedAt: p.pairCreatedAt || 0,
+                                txns24h: (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0),
+                                buys24h: p.txns?.h24?.buys || 0,
+                                sells24h: p.txns?.h24?.sells || 0,
+                                url: p.url || ''
+                            };
+                        }
+                    }
+                    for (const t of Object.values(byToken)) {
+                        // Skip if already in our list
+                        if (!allTokens.find(x => x.mint === t.mint)) {
+                            allTokens.push(t);
+                        }
+                    }
+                }
+            } catch(e) {}
+            fill.style.width = (30 + (i / solanaMints.length) * 60) + '%';
+        }
+
+        // Sort by volume
+        allTokens.sort((a, b) => b.volume24h - a.volume24h);
+
+        fill.style.width = '95%';
+        text.textContent = 'Processing ' + allTokens.length + ' tokens...';
+
+        // Merge with existing tokens (don't duplicate)
+        const existingMints = new Set(recapData.tokens.map(t => t.mint));
+        let added = 0;
+        for (const t of allTokens.slice(0, 30)) {
+            if (existingMints.has(t.mint)) continue;
+            const cook = classifyCook(t);
+            recapData.tokens.push({
+                mint: t.mint,
+                symbol: t.symbol,
+                name: t.name,
+                description: '',
+                athMcap: t.marketCap, // best we have — user can edit
+                currentMcap: t.marketCap,
+                volume24h: t.volume24h,
+                priceChange24h: t.priceChange24h,
+                priceChange6h: t.priceChange6h,
+                priceChange1h: t.priceChange1h,
+                liquidity: t.liquidity,
+                txns24h: t.txns24h,
+                buys24h: t.buys24h,
+                sells24h: t.sells24h,
+                cook: cook,
+                tags: [],
+                pairAddress: t.pairAddress,
+                dexUrl: t.url,
+                addedAt: Date.now()
+            });
+            added++;
+        }
+
+        fill.style.width = '100%';
+        text.textContent = 'Done! Added ' + added + ' tokens (' + allTokens.length + ' found total)';
+        dirty = true;
+        renderTokens();
+        setTimeout(() => { prog.style.display = 'none'; }, 3000);
+
+    } catch(e) {
+        text.textContent = 'Error: ' + e.message;
+        fill.style.width = '0%';
+        setTimeout(() => { prog.style.display = 'none'; }, 5000);
+    }
+}
+
+function classifyCook(t) {
+    // If price dropped >60% from a peak = fast cook
+    // If sustained = slow cook
+    if (t.priceChange24h < -60) return 'fast';
+    if (t.priceChange24h < -30) return 'mid';
+    if (t.priceChange24h > 0) return 'slow';
+    return 'mid';
+}
+
+// ========== ADD TOKEN ==========
+async function addTokenByMint() {
+    const input = document.getElementById('addTokenInput');
+    const val = input.value.trim();
+    if (!val) return;
+
+    // Check if it's a mint address (base58, 32-44 chars)
+    if (val.length >= 32 && val.length <= 44) {
+        // Fetch from DexScreener
+        try {
+            const resp = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + val);
+            if (!resp.ok) throw new Error('Not found');
+            const pairs = await resp.json();
+            if (!pairs || pairs.length === 0) throw new Error('No pairs found');
+
+            // Take highest volume pair
+            pairs.sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0));
+            const p = pairs[0];
+
+            if (recapData.tokens.find(t => t.mint === val)) {
+                showToast('Token already in list');
+                return;
+            }
+
+            const t = {
+                mint: val,
+                symbol: p.baseToken?.symbol || '???',
+                name: p.baseToken?.name || '',
+                volume24h: p.volume?.h24 || 0,
+                priceUsd: parseFloat(p.priceUsd) || 0,
+                marketCap: p.marketCap || p.fdv || 0,
+                priceChange24h: p.priceChange?.h24 || 0,
+                priceChange6h: p.priceChange?.h6 || 0,
+                priceChange1h: p.priceChange?.h1 || 0,
+                liquidity: p.liquidity?.usd || 0,
+                txns24h: (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0),
+                buys24h: p.txns?.h24?.buys || 0,
+                sells24h: p.txns?.h24?.sells || 0,
+                pairAddress: p.pairAddress || '',
+                url: p.url || ''
+            };
+
+            recapData.tokens.push({
+                mint: val,
+                symbol: t.symbol,
+                name: t.name,
+                description: '',
+                athMcap: t.marketCap,
+                currentMcap: t.marketCap,
+                volume24h: t.volume24h,
+                priceChange24h: t.priceChange24h,
+                priceChange6h: t.priceChange6h,
+                priceChange1h: t.priceChange1h,
+                liquidity: t.liquidity,
+                txns24h: t.txns24h,
+                buys24h: t.buys24h,
+                sells24h: t.sells24h,
+                cook: classifyCook(t),
+                tags: [],
+                pairAddress: t.pairAddress,
+                dexUrl: t.url,
+                addedAt: Date.now()
+            });
+
+            dirty = true;
+            renderTokens();
+            input.value = '';
+            showToast('Added ' + t.symbol);
+        } catch(e) {
+            showToast('Error: ' + e.message);
+        }
+    } else {
+        showToast('Paste a valid Solana token address (CA)');
+    }
+}
+
+function addManualToken() {
+    const symbol = prompt('Token symbol (e.g. PUNCH):');
+    if (!symbol) return;
+    const name = prompt('Token name (optional):') || '';
+
+    recapData.tokens.push({
+        mint: '',
+        symbol: symbol.toUpperCase(),
+        name: name,
+        description: '',
+        athMcap: 0,
+        currentMcap: 0,
+        volume24h: 0,
+        priceChange24h: 0,
+        priceChange6h: 0,
+        priceChange1h: 0,
+        liquidity: 0,
+        txns24h: 0,
+        buys24h: 0,
+        sells24h: 0,
+        cook: 'fast',
+        tags: [],
+        pairAddress: '',
+        dexUrl: '',
+        addedAt: Date.now()
+    });
+
+    dirty = true;
+    renderTokens();
+    showToast('Added ' + symbol);
+}
+
+// ========== RENDER ==========
+function formatMcap(v) {
+    if (!v || v === 0) return '-';
+    if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+    return '$' + Math.round(v);
+}
+
+function formatVol(v) {
+    if (!v) return '-';
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+    return '$' + Math.round(v);
+}
+
+function pctClass(v) {
+    if (v > 0) return 'green';
+    if (v < 0) return 'red';
+    return 'gray';
+}
+
+function renderTokens() {
+    const grid = document.getElementById('tokensGrid');
+    const empty = document.getElementById('emptyState');
+    const countLabel = document.getElementById('tokenCountLabel');
+
+    countLabel.textContent = recapData.tokens.length;
+
+    if (recapData.tokens.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        document.getElementById('summaryRow').style.display = 'none';
+        return;
+    }
+
+    empty.style.display = 'none';
+    renderSummary();
+
+    grid.innerHTML = recapData.tokens.map((t, i) => {
+        const cook = t.cook || 'mid';
+        const tagsHtml = (t.tags || []).map(tag => '<span class="tag custom">' + tag + '</span>').join('');
+
+        let linksHtml = '';
+        if (t.mint) {
+            linksHtml += '<a href="profile.html?wallet=' + t.mint + '" target="_blank" class="profile">Profile</a>';
+            if (t.dexUrl) {
+                linksHtml += '<a href="' + t.dexUrl + '" target="_blank" class="ds">DexScreener</a>';
+            } else {
+                linksHtml += '<a href="https://dexscreener.com/solana/' + t.mint + '" target="_blank" class="ds">DexScreener</a>';
+            }
+            linksHtml += '<a href="https://solscan.io/token/' + t.mint + '" target="_blank" class="solscan">Solscan</a>';
+            linksHtml += '<a href="https://www.birdeye.so/token/' + t.mint + '?chain=solana" target="_blank" class="birdeye">Birdeye</a>';
+        }
+
+        return '<div class="token-card ' + cook + '" data-index="' + i + '">' +
+            '<div class="card-header">' +
+                '<span class="drag-handle" title="Drag to reorder">&#9776;</span>' +
+                '<span class="card-symbol">' + (t.symbol || '???') + '</span>' +
+                '<span class="card-name">' + (t.name || '') + '</span>' +
+                '<span class="card-cook ' + cook + '" onclick="cycleCook(' + i + ')" title="Click to change">' + COOK_LABELS[cook] + '</span>' +
+                '<div class="card-actions">' +
+                    '<button class="card-action" onclick="refreshToken(' + i + ')" title="Refresh data">&#8635;</button>' +
+                    '<button class="card-action" onclick="addTag(' + i + ')" title="Add tag">&#9733;</button>' +
+                    '<button class="card-action" onclick="moveToken(' + i + ', -1)" title="Move up">&uarr;</button>' +
+                    '<button class="card-action" onclick="moveToken(' + i + ', 1)" title="Move down">&darr;</button>' +
+                    '<button class="card-action" onclick="removeToken(' + i + ')" title="Remove">&times;</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="card-stats">' +
+                '<div class="stat"><span class="stat-label">ATH MCap</span><span class="stat-value yellow" contenteditable="true" onblur="updateAth(' + i + ', this)" title="Click to edit">' + formatMcap(t.athMcap) + '</span></div>' +
+                '<div class="stat"><span class="stat-label">Current MCap</span><span class="stat-value blue">' + formatMcap(t.currentMcap) + '</span></div>' +
+                '<div class="stat"><span class="stat-label">24h Vol</span><span class="stat-value">' + formatVol(t.volume24h) + '</span></div>' +
+                '<div class="stat"><span class="stat-label">24h</span><span class="stat-value ' + pctClass(t.priceChange24h) + '">' + (t.priceChange24h > 0 ? '+' : '') + (t.priceChange24h || 0).toFixed(1) + '%</span></div>' +
+                '<div class="stat"><span class="stat-label">6h</span><span class="stat-value ' + pctClass(t.priceChange6h) + '">' + (t.priceChange6h > 0 ? '+' : '') + (t.priceChange6h || 0).toFixed(1) + '%</span></div>' +
+                '<div class="stat"><span class="stat-label">Liq</span><span class="stat-value">' + formatVol(t.liquidity) + '</span></div>' +
+                '<div class="stat"><span class="stat-label">Txns</span><span class="stat-value">' + (t.txns24h || 0) + '</span></div>' +
+                '<div class="stat"><span class="stat-label">B/S</span><span class="stat-value"><span class="green">' + (t.buys24h || 0) + '</span>/<span class="red">' + (t.sells24h || 0) + '</span></span></div>' +
+            '</div>' +
+            '<div class="card-desc"><textarea placeholder="What happened with ' + (t.symbol || 'this token') + '? The story, the narrative, why it pumped/dumped..." onchange="markDirty()">' + (t.description || '') + '</textarea></div>' +
+            (tagsHtml ? '<div class="card-tags">' + tagsHtml + '</div>' : '') +
+            (linksHtml ? '<div class="card-links">' + linksHtml + '</div>' : '') +
+        '</div>';
+    }).join('');
+}
+
+function renderSummary() {
+    const tokens = recapData.tokens;
+    const fastCount = tokens.filter(t => t.cook === 'fast').length;
+    const slowCount = tokens.filter(t => t.cook === 'slow').length;
+    const totalVol = tokens.reduce((s, t) => s + (t.volume24h || 0), 0);
+    const avgChange = tokens.length > 0 ? tokens.reduce((s, t) => s + (t.priceChange24h || 0), 0) / tokens.length : 0;
+
+    const row = document.getElementById('summaryRow');
+    row.style.display = 'flex';
+    row.innerHTML =
+        '<div class="summary-pill"><span>Tokens:</span> <span class="val blue">' + tokens.length + '</span></div>' +
+        '<div class="summary-pill"><span>Fast Cook:</span> <span class="val red">' + fastCount + '</span></div>' +
+        '<div class="summary-pill"><span>Slow Cook:</span> <span class="val green">' + slowCount + '</span></div>' +
+        '<div class="summary-pill"><span>Total Vol:</span> <span class="val yellow">' + formatVol(totalVol) + '</span></div>' +
+        '<div class="summary-pill"><span>Avg 24h:</span> <span class="val ' + pctClass(avgChange) + '">' + (avgChange > 0 ? '+' : '') + avgChange.toFixed(1) + '%</span></div>';
+}
+
+// ========== TOKEN ACTIONS ==========
+function cycleCook(i) {
+    const t = recapData.tokens[i];
+    const idx = COOK_TYPES.indexOf(t.cook);
+    t.cook = COOK_TYPES[(idx + 1) % COOK_TYPES.length];
+    dirty = true;
+    renderTokens();
+}
+
+function removeToken(i) {
+    const t = recapData.tokens[i];
+    if (!confirm('Remove ' + (t.symbol || 'this token') + '?')) return;
+    recapData.tokens.splice(i, 1);
+    dirty = true;
+    renderTokens();
+}
+
+function moveToken(i, dir) {
+    const newIdx = i + dir;
+    if (newIdx < 0 || newIdx >= recapData.tokens.length) return;
+    const temp = recapData.tokens[i];
+    recapData.tokens[i] = recapData.tokens[newIdx];
+    recapData.tokens[newIdx] = temp;
+    dirty = true;
+    renderTokens();
+}
+
+function addTag(i) {
+    const tag = prompt('Add tag (e.g. locked, dev, viral, ai):');
+    if (!tag) return;
+    if (!recapData.tokens[i].tags) recapData.tokens[i].tags = [];
+    recapData.tokens[i].tags.push(tag.toUpperCase());
+    dirty = true;
+    renderTokens();
+}
+
+function updateAth(i, el) {
+    const text = el.textContent.trim().replace(/[$,]/g, '');
+    let val = 0;
+    const lower = text.toLowerCase();
+    if (lower.endsWith('b')) val = parseFloat(lower) * 1e9;
+    else if (lower.endsWith('m')) val = parseFloat(lower) * 1e6;
+    else if (lower.endsWith('k')) val = parseFloat(lower) * 1e3;
+    else val = parseFloat(lower) || 0;
+    recapData.tokens[i].athMcap = val;
+    el.textContent = formatMcap(val);
+    dirty = true;
+}
+
+async function refreshToken(i) {
+    const t = recapData.tokens[i];
+    if (!t.mint) { showToast('No mint address'); return; }
+    try {
+        const resp = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + t.mint);
+        if (!resp.ok) throw new Error('Failed');
+        const pairs = await resp.json();
+        if (!pairs || pairs.length === 0) throw new Error('No pairs');
+        pairs.sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0));
+        const p = pairs[0];
+        const newMcap = p.marketCap || p.fdv || 0;
+        t.currentMcap = newMcap;
+        if (newMcap > (t.athMcap || 0)) t.athMcap = newMcap;
+        t.volume24h = p.volume?.h24 || 0;
+        t.priceChange24h = p.priceChange?.h24 || 0;
+        t.priceChange6h = p.priceChange?.h6 || 0;
+        t.priceChange1h = p.priceChange?.h1 || 0;
+        t.liquidity = p.liquidity?.usd || 0;
+        t.txns24h = (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0);
+        t.buys24h = p.txns?.h24?.buys || 0;
+        t.sells24h = p.txns?.h24?.sells || 0;
+        t.cook = classifyCook(t);
+        dirty = true;
+        renderTokens();
+        showToast(t.symbol + ' refreshed');
+    } catch(e) {
+        showToast('Refresh failed: ' + e.message);
+    }
+}
+
+function markDirty() { dirty = true; }
+
+// ========== EXPORT ==========
+function exportRecap() {
+    // Sync descriptions
+    document.querySelectorAll('.token-card').forEach((card, i) => {
+        if (recapData.tokens[i]) {
+            const ta = card.querySelector('.card-desc textarea');
+            if (ta) recapData.tokens[i].description = ta.value;
+        }
+    });
+
+    const d = new Date(currentDate + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+
+    let text = dateStr + ' Brief Recap\n';
+    text += '='.repeat(40) + '\n\n';
+
+    if (recapData.briefRecap) {
+        text += recapData.briefRecap + '\n\n';
+    }
+
+    if (recapData.tokens.length > 0) {
+        text += 'SOL Highlights\n';
+        text += '-'.repeat(40) + '\n\n';
+
+        for (const t of recapData.tokens) {
+            text += t.symbol + (t.name ? ' - ' + t.name : '') + '\n';
+            if (t.description) text += t.description + '\n';
+            const parts = [];
+            if (t.athMcap) parts.push('ATH ' + formatMcap(t.athMcap));
+            if (t.currentMcap) parts.push('Currently ' + formatMcap(t.currentMcap));
+            if (parts.length) text += parts.join(' | ') + '\n';
+            text += (COOK_LABELS[t.cook] || 'Unknown') + '\n';
+            if (t.tags && t.tags.length) text += 'Tags: ' + t.tags.join(', ') + '\n';
+            text += '\n';
+        }
+    }
+
+    // Copy to clipboard and download
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard + downloaded'));
+
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'recap_' + currentDate + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ========== UTILS ==========
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+
+// Auto-save on brief text change
+document.getElementById('briefText').addEventListener('input', () => { dirty = true; });
+
+// Warn before leaving with unsaved changes
+window.addEventListener('beforeunload', (e) => {
+    if (dirty) {
+        saveRecap(); // Auto-save on leave
+    }
+});
+
+// Keyboard shortcut: Ctrl+S to save
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveRecap();
+    }
+});
+
+// Init
+initDate();
+</script>
+<script src="shared.js"></script>
+</body>
+</html>
