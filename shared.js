@@ -57,7 +57,9 @@ function injectLayout() {
         { href: 'overlap.html', label: 'Overlap', icon: 'O' },
         { href: 'power-traders.html', label: 'Power Traders', icon: 'W' },
         { href: 'recap.html', label: 'Daily Recap', icon: 'R' },
+        { href: 'intel.html', label: 'Intel', icon: 'I' },
         { href: 'profile.html', label: 'Profile', icon: 'P' },
+        { href: 'alerts.html', label: 'Alerts', icon: 'A' },
     ];
     
     const navItems = pages.map(p => {
