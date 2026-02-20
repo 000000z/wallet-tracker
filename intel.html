@@ -964,11 +964,6 @@ async function fetchTwitterIntel(mint, symbol, name) {
 
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
-            if (resp.status === 503) {
-                // No API key configured — hide section silently
-                el.innerHTML = '<div class="twitter-fallback-note">Twitter auto-scan not configured (no API key). Use manual search below.</div>';
-                return;
-            }
             throw new Error(err.error || 'Worker returned ' + resp.status);
         }
 
