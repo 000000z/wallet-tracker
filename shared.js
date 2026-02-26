@@ -60,6 +60,7 @@ function injectLayout() {
         { href: 'intel.html', label: 'Intel', icon: 'I' },
         { href: 'profile.html', label: 'Profile', icon: 'P' },
         { href: 'alerts.html', label: 'Alerts', icon: 'A' },
+        { href: 'sniper.html', label: 'Claim Sniper', icon: 'S' },
     ];
     
     const navItems = pages.map(p => {
