@@ -311,14 +311,32 @@ async function executeBuy(tokenAddress, poolKey) {
   try {
     // Get current gas prices and add priority fee for faster inclusion
     const feeData = await provider.getFeeData();
-    const maxPriorityFee = feeData.maxPriorityFeePerGas
-      ? feeData.maxPriorityFeePerGas * 2n  // 2x priority to beat others
+    let maxPriorityFee = feeData.maxPriorityFeePerGas
+      ? feeData.maxPriorityFeePerGas * 2n
       : ethers.parseUnits("0.1", "gwei");
-    const maxFee = feeData.maxFeePerGas
+    let maxFee = feeData.maxFeePerGas
       ? feeData.maxFeePerGas + maxPriorityFee
-      : undefined;
+      : maxPriorityFee;
 
-    log("info", `  Gas: maxPriorityFee=${ethers.formatUnits(maxPriorityFee, "gwei")} gwei`);
+    // Cap gas fees at 5% of wallet balance
+    const balance = await provider.getBalance(wallet.address);
+    const maxGasBudget = balance / 20n; // 5%
+    const estimatedGasCost = GAS_LIMIT * maxFee;
+
+    if (estimatedGasCost > maxGasBudget) {
+      maxFee = maxGasBudget / GAS_LIMIT;
+      maxPriorityFee = maxPriorityFee < maxFee ? maxPriorityFee : maxFee;
+      log("info", `  Gas capped at 5% of balance (${ethers.formatEther(maxGasBudget)} ETH)`);
+    }
+
+    // Abort if balance can't cover swap + gas
+    const totalCost = amountIn + estimatedGasCost;
+    if (totalCost > balance) {
+      log("error", `  SKIP: Insufficient balance. Need ${ethers.formatEther(totalCost)} ETH, have ${ethers.formatEther(balance)} ETH`);
+      return null;
+    }
+
+    log("info", `  Gas: maxFee=${ethers.formatUnits(maxFee, "gwei")} gwei, maxPriority=${ethers.formatUnits(maxPriorityFee, "gwei")} gwei`);
 
     const tx = await router.execute(commands, inputs, deadline, {
       value: amountIn,
