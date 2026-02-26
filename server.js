@@ -144,13 +144,20 @@ function saveState() {
 }
 
 // ─── Logging (console + WebSocket broadcast) ─────────────────────────────────
+const LOG_BUFFER_SIZE = 200;
+const logBuffer = [];
+
 function log(type, msg) {
   const ts = new Date().toISOString();
   const line = `[${ts}] ${msg}`;
   console.log(line);
 
+  const entry = { type, msg, ts };
+  logBuffer.push(entry);
+  if (logBuffer.length > LOG_BUFFER_SIZE) logBuffer.shift();
+
   // Broadcast to all connected WebSocket clients
-  const payload = JSON.stringify({ type, msg, ts });
+  const payload = JSON.stringify(entry);
   for (const client of wss.clients) {
     if (client.readyState === 1) { // WebSocket.OPEN
       client.send(payload);
@@ -733,7 +740,12 @@ wss.on("connection", (ws) => {
   console.log("WebSocket client connected");
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
-  // Send current state on connect
+
+  // Replay last 200 log entries so returning clients see history
+  for (const entry of logBuffer) {
+    ws.send(JSON.stringify(entry));
+  }
+
   ws.send(JSON.stringify({
     type: "info",
     msg: `Connected to sniper server. Status: ${sniperRunning ? "Running" : "Stopped"}`,
