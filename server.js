@@ -143,32 +143,19 @@ async function resolvePoolKey(tokenAddress, amountIn) {
   const tokenLower = tokenAddress.toLowerCase();
   if (poolKeyCache.has(tokenLower)) return poolKeyCache.get(tokenLower);
 
-  // Strategy 1: Factory event lookup
-  try {
-    const filter = factory.filters.TokenCreated(tokenAddress);
-    const events = await factory.queryFilter(filter, 0, "latest");
-    if (events.length > 0) {
-      const ev = events[0];
-      const poolKey = {
-        hooks: ev.args.hooks,
-        fee: ev.args.fee.toString(),
-        tickSpacing: Number(ev.args.tickSpacing),
-      };
-      log("info", `  Pool resolved via factory event: hook=${poolKey.hooks}, fee=${poolKey.fee}`);
-      poolKeyCache.set(tokenLower, poolKey);
-      return poolKey;
-    }
-  } catch (err) {
-    log("error", `  Factory event lookup failed: ${err.message}`);
-  }
+  // Sort token pair (V4 requires currency0 < currency1)
+  const wethLower = WETH_BASE.toLowerCase();
+  const [currency0, currency1] = tokenLower < wethLower
+    ? [tokenAddress, WETH_BASE]
+    : [WETH_BASE, tokenAddress];
 
-  // Strategy 2: Known hook probing via quoter
+  // Strategy 1: Known hook probing via quoter (no log queries needed)
   log("info", "  Trying known hooks via quoter...");
   for (const hook of KNOWN_HOOKS) {
     try {
       const params = {
-        currency0: ethers.ZeroAddress,
-        currency1: tokenAddress,
+        currency0,
+        currency1,
         fee: hook.fee,
         tickSpacing: TICK_SPACING,
         hooks: hook.addr,
@@ -178,7 +165,7 @@ async function resolvePoolKey(tokenAddress, amountIn) {
       };
       const result = await quoter.quoteExactInputSingle.staticCall(params);
       if (result.amountOut > 0n) {
-        const poolKey = { hooks: hook.addr, fee: hook.fee, tickSpacing: TICK_SPACING };
+        const poolKey = { hooks: hook.addr, fee: hook.fee, tickSpacing: TICK_SPACING, currency0, currency1 };
         log("info", `  Pool resolved via quoter: ${hook.label}`);
         poolKeyCache.set(tokenLower, poolKey);
         return poolKey;
@@ -186,6 +173,29 @@ async function resolvePoolKey(tokenAddress, amountIn) {
     } catch {
       // try next hook
     }
+  }
+
+  // Strategy 2: Factory event lookup (narrow range — Alchemy free = 10 blocks max)
+  try {
+    const currentBlock = await provider.getBlockNumber();
+    const filter = factory.filters.TokenCreated(tokenAddress);
+    // Search last 10 blocks only — token was likely just created if we're sniping it
+    const events = await factory.queryFilter(filter, currentBlock - 9, currentBlock);
+    if (events.length > 0) {
+      const ev = events[0];
+      const poolKey = {
+        hooks: ev.args.hooks,
+        fee: ev.args.fee.toString(),
+        tickSpacing: Number(ev.args.tickSpacing),
+        currency0,
+        currency1,
+      };
+      log("info", `  Pool resolved via factory event: hook=${poolKey.hooks}, fee=${poolKey.fee}`);
+      poolKeyCache.set(tokenLower, poolKey);
+      return poolKey;
+    }
+  } catch (err) {
+    log("error", `  Factory event lookup failed: ${err.message}`);
   }
 
   return null;
@@ -198,14 +208,18 @@ function encodeV4Swap(tokenAddress, poolKey, amountIn, amountOutMin) {
     [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL]
   );
 
-  const currency0 = ethers.ZeroAddress;
-  const currency1 = tokenAddress;
+  // Use sorted order from poolKey, determine swap direction
+  const { currency0, currency1 } = poolKey;
+  const zeroForOne = currency0.toLowerCase() !== tokenAddress.toLowerCase();
+
+  const settleToken = zeroForOne ? currency0 : currency1;
+  const takeToken = zeroForOne ? currency1 : currency0;
 
   const swapParams = ethers.AbiCoder.defaultAbiCoder().encode(
     ["tuple(tuple(address,address,uint24,int24,address) poolKey, bool zeroForOne, uint128 amountIn, uint128 amountOutMinimum, uint160 sqrtPriceLimitX96, bytes hookData)"],
     [{
       poolKey: { 0: currency0, 1: currency1, 2: poolKey.fee, 3: poolKey.tickSpacing, 4: poolKey.hooks },
-      zeroForOne: true,
+      zeroForOne,
       amountIn,
       amountOutMinimum: amountOutMin,
       sqrtPriceLimitX96: 0n,
@@ -214,10 +228,10 @@ function encodeV4Swap(tokenAddress, poolKey, amountIn, amountOutMin) {
   );
 
   const settleParams = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["address", "uint256"], [currency0, amountIn]
+    ["address", "uint256"], [settleToken, amountIn]
   );
   const takeParams = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["address", "uint256"], [currency1, amountOutMin]
+    ["address", "uint256"], [takeToken, amountOutMin]
   );
 
   const v4Input = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -236,8 +250,8 @@ async function executeBuy(tokenAddress, poolKey) {
   let amountOut;
   try {
     const result = await quoter.quoteExactInputSingle.staticCall({
-      currency0: ethers.ZeroAddress,
-      currency1: tokenAddress,
+      currency0: poolKey.currency0,
+      currency1: poolKey.currency1,
       fee: poolKey.fee,
       tickSpacing: poolKey.tickSpacing,
       hooks: poolKey.hooks,
