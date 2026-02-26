@@ -61,6 +61,7 @@ function injectLayout() {
         { href: 'profile.html', label: 'Profile', icon: 'P' },
         { href: 'alerts.html', label: 'Alerts', icon: 'A' },
         { href: 'sniper.html', label: 'Claim Sniper', icon: 'S' },
+        { href: 'pumpswap-sniper.html', label: 'Pump Sniper', icon: 'PS' },
     ];
     
     const navItems = pages.map(p => {
