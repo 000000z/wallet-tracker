@@ -300,11 +300,23 @@ async function executeBuy(tokenAddress, poolKey) {
 }
 
 // ─── Resolve actual token from TX receipt (WETH fix) ─────────────────────────
+const transferTopic = ethers.id("Transfer(address,address,uint256)");
+const knownAddresses = new Set([
+  WETH_BASE,
+  ADDRESSES.feeLocker,
+  ADDRESSES.clankerFactory,
+  ADDRESSES.universalRouter,
+  ADDRESSES.poolManager,
+  ADDRESSES.v4Quoter,
+  ...KNOWN_HOOKS.map(h => h.addr),
+].map(a => a.toLowerCase()));
+
 async function resolveTokenFromTx(txHash) {
   try {
     const receipt = await provider.getTransactionReceipt(txHash);
     if (!receipt) return null;
 
+    // 1. Look for a non-WETH ClaimTokens event in same TX
     const iface = new ethers.Interface(FEE_LOCKER_ABI);
     for (const logEntry of receipt.logs) {
       if (logEntry.address.toLowerCase() !== ADDRESSES.feeLocker.toLowerCase()) continue;
@@ -314,6 +326,17 @@ async function resolveTokenFromTx(txHash) {
         const token = parsed.args.token;
         if (token.toLowerCase() !== WETH_BASE.toLowerCase()) return token;
       } catch { /* skip */ }
+    }
+
+    // 2. Look for ERC-20 Transfer from an unknown contract (the actual token)
+    for (const logEntry of receipt.logs) {
+      if (logEntry.topics[0] !== transferTopic) continue;
+      if (!knownAddresses.has(logEntry.address.toLowerCase())) return logEntry.address;
+    }
+
+    // 3. Any log emitter that isn't known infrastructure
+    for (const logEntry of receipt.logs) {
+      if (!knownAddresses.has(logEntry.address.toLowerCase())) return logEntry.address;
     }
   } catch (err) {
     log("error", `  TX receipt lookup failed: ${err.message}`);
