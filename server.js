@@ -578,9 +578,11 @@ app.get("/api/sniper/history", (req, res) => {
   res.json(buyHistory);
 });
 
-// ─── WebSocket ───────────────────────────────────────────────────────────────
+// ─── WebSocket (with heartbeat to prevent Railway proxy timeout) ─────────────
 wss.on("connection", (ws) => {
   console.log("WebSocket client connected");
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
   // Send current state on connect
   ws.send(JSON.stringify({
     type: "info",
@@ -588,6 +590,16 @@ wss.on("connection", (ws) => {
     ts: new Date().toISOString(),
   }));
 });
+
+// Ping every 25s to keep connections alive through Railway's proxy
+const heartbeat = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 25000);
+wss.on("close", () => clearInterval(heartbeat));
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────
 function shutdown() {
