@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PumpSwap Claim Sniper</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+  h1 { color: #58a6ff; font-size: 1.3rem; padding: 16px 20px; border-bottom: 1px solid #21262d; }
+  h1 span { color: #8b949e; font-size: 0.8rem; margin-left: 8px; }
+
+  .status-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 16px 20px; border-bottom: 1px solid #21262d; }
+  .stat { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 12px; }
+  .stat-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-value { font-size: 1.1rem; color: #e6edf3; margin-top: 4px; word-break: break-all; }
+  .stat-value.running { color: #3fb950; }
+  .stat-value.stopped { color: #f85149; }
+
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #21262d; }
+  @media (max-width: 800px) { .config-grid { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 0.75rem; color: #8b949e; margin-bottom: 4px; }
+  input, textarea, select { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; color: #e6edf3; font-family: inherit; font-size: 0.85rem; }
+  input:focus, textarea:focus { outline: none; border-color: #58a6ff; }
+  textarea { min-height: 60px; resize: vertical; }
+  .hint { font-size: 0.65rem; color: #484f58; margin-top: 2px; }
+
+  .pk-wrap { position: relative; }
+  .pk-wrap input { padding-right: 50px; }
+  .pk-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: #21262d; border: none; color: #8b949e; cursor: pointer; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; }
+
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+  .toggle input { display: none; }
+  .toggle-slider { position: absolute; inset: 0; background: #f85149; border-radius: 24px; transition: 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+  .toggle input:checked + .toggle-slider { background: #3fb950; }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+  .toggle-label { font-size: 0.8rem; }
+
+  .controls { display: flex; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+  .btn { padding: 8px 20px; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.85rem; background: #161b22; color: #c9d1d9; transition: 0.15s; }
+  .btn:hover { background: #21262d; }
+  .btn-start { color: #3fb950; border-color: #238636; }
+  .btn-start:hover { background: #238636; color: #fff; }
+  .btn-stop { color: #f85149; border-color: #da3633; }
+  .btn-stop:hover { background: #da3633; color: #fff; }
+  .btn-save { color: #58a6ff; border-color: #1f6feb; }
+  .btn-save:hover { background: #1f6feb; color: #fff; }
+
+  .log-section { padding: 16px 20px; }
+  .log-section h2 { font-size: 0.9rem; color: #f0883e; margin-bottom: 10px; }
+  #eventLog { background: #010409; border: 1px solid #21262d; border-radius: 8px; padding: 12px; max-height: 500px; overflow-y: auto; font-size: 0.78rem; line-height: 1.6; }
+  .log-line { border-left: 3px solid #30363d; padding-left: 10px; margin-bottom: 2px; }
+  .log-line .ts { color: #484f58; margin-right: 6px; }
+  .log-line.claim { border-color: #f0883e; }
+  .log-line.buy { border-color: #3fb950; }
+  .log-line.error { border-color: #f85149; color: #f85149; }
+  .log-line.skip { border-color: #8b949e; color: #8b949e; }
+  .log-line.info { border-color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<h1>PumpSwap Claim Sniper <span>Solana</span></h1>
+
+<div class="status-bar">
+  <div class="stat">
+    <div class="stat-label">Status</div>
+    <div class="stat-value stopped" id="statusVal">Stopped</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Wallet</div>
+    <div class="stat-value" id="walletVal" style="font-size:0.7rem">--</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">SOL Balance</div>
+    <div class="stat-value" id="balanceVal">--</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Claims Detected</div>
+    <div class="stat-value" id="claimsVal">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Buys Executed</div>
+    <div class="stat-value" id="buysVal">0</div>
+  </div>
+</div>
+
+<div class="config-grid">
+  <div>
+    <label>Private Key</label>
+    <div class="pk-wrap">
+      <input type="password" id="cfgPrivateKey" placeholder="Base58 Solana secret key">
+      <button class="pk-toggle" onclick="togglePK()">show</button>
+    </div>
+    <div class="hint">Set via Railway env vars (optional override here)</div>
+  </div>
+  <div>
+    <label>RPC URL</label>
+    <input type="text" id="cfgRpcUrl" placeholder="https://mainnet.helius-rpc.com/?api-key=KEY">
+  </div>
+  <div>
+    <label>Buy Amount (SOL)</label>
+    <input type="text" id="cfgBuyAmount" placeholder="0.1">
+  </div>
+  <div>
+    <label>Slippage %</label>
+    <input type="text" id="cfgSlippage" placeholder="25">
+  </div>
+  <div>
+    <label>Priority Fee (SOL)</label>
+    <input type="text" id="cfgPriorityFee" placeholder="0.005">
+  </div>
+  <div>
+    <label>Max Buys / Token</label>
+    <input type="text" id="cfgMaxBuys" placeholder="1">
+  </div>
+  <div>
+    <label>Dry Run</label>
+    <div class="toggle-wrap">
+      <label class="toggle">
+        <input type="checkbox" id="cfgDryRun" checked>
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="toggle-label" id="dryRunLabel">ON &mdash; no real transactions</span>
+    </div>
+  </div>
+  <div>
+    <label>Watched Creators (one per line, empty = all)</label>
+    <textarea id="cfgWatchedCreators" placeholder="Creator1PublicKey&#10;Creator2PublicKey"></textarea>
+  </div>
+  <div>
+    <label>Blacklisted Tokens (one per line)</label>
+    <textarea id="cfgBlacklistedTokens" placeholder="TokenMint1&#10;TokenMint2"></textarea>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-save" onclick="saveConfig()">Save Config</button>
+  <button class="btn btn-start" id="btnStart" onclick="startSniper()">Start Sniper</button>
+  <button class="btn btn-stop" id="btnStop" onclick="stopSniper()">Stop Sniper</button>
+  <button class="btn" onclick="clearLog()">Clear Log</button>
+  <button class="btn" onclick="refreshBalance()">Refresh Balance</button>
+</div>
+
+<div class="log-section">
+  <h2>EVENT LOG</h2>
+  <div id="eventLog"></div>
+</div>
+
+<script>
+const logEl = document.getElementById('eventLog');
+const MAX_LOG_LINES = 500;
+
+function logEvent(type, msg, ts) {
+    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = 'log-line ' + (type || 'info');
+    div.innerHTML = '<span class="ts">' + time + '</span> ' + escapeHtml(msg);
+    logEl.prepend(div);
+    while (logEl.children.length > MAX_LOG_LINES) logEl.removeChild(logEl.lastChild);
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function clearLog() { logEl.innerHTML = ''; }
+
+// ─── WebSocket ───────────────────────────────────────────────────────────────
+let ws = null;
+let wsRetryTimer = null;
+
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(proto + '//' + location.host + '/ws-pump');
+
+    ws.onopen = () => {
+        logEvent('info', 'WebSocket connected to server');
+        if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null; }
+    };
+
+    ws.onmessage = (ev) => {
+        try {
+            const data = JSON.parse(ev.data);
+            logEvent(data.type || 'info', data.msg || '', data.ts);
+        } catch {
+            logEvent('info', ev.data);
+        }
+    };
+
+    ws.onclose = () => {
+        logEvent('error', 'WebSocket disconnected - reconnecting in 3s...');
+        wsRetryTimer = setTimeout(connectWS, 3000);
+    };
+
+    ws.onerror = () => { ws.close(); };
+}
+
+// ─── Status Polling ──────────────────────────────────────────────────────────
+async function pollStatus() {
+    try {
+        const res = await fetch('/api/pumpswap/status');
+        const d = await res.json();
+        const el = document.getElementById('statusVal');
+        el.textContent = d.running ? 'Running' : 'Stopped';
+        el.className = 'stat-value ' + (d.running ? 'running' : 'stopped');
+        document.getElementById('walletVal').textContent = d.wallet || '--';
+        document.getElementById('balanceVal').textContent = d.balance ? d.balance + ' SOL' : '--';
+        document.getElementById('claimsVal').textContent = d.claimsDetected;
+        document.getElementById('buysVal').textContent = d.buysExecuted;
+    } catch {}
+}
+
+async function loadConfig() {
+    try {
+        const res = await fetch('/api/pumpswap/config');
+        const c = await res.json();
+        document.getElementById('cfgRpcUrl').value = c.rpcUrl || '';
+        document.getElementById('cfgBuyAmount').value = c.buyAmountSol || '';
+        document.getElementById('cfgSlippage').value = c.slippagePct || '';
+        document.getElementById('cfgPriorityFee').value = c.priorityFeeSol || '';
+        document.getElementById('cfgMaxBuys').value = c.maxBuysPerToken || '';
+        document.getElementById('cfgDryRun').checked = c.dryRun;
+        updateDryRunLabel();
+        document.getElementById('cfgWatchedCreators').value = (c.watchedCreators || []).join('\n');
+        document.getElementById('cfgBlacklistedTokens').value = (c.blacklistedTokens || []).join('\n');
+    } catch {}
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+async function saveConfig() {
+    const body = {
+        rpcUrl: document.getElementById('cfgRpcUrl').value,
+        buyAmountSol: document.getElementById('cfgBuyAmount').value,
+        slippagePct: document.getElementById('cfgSlippage').value,
+        priorityFeeSol: document.getElementById('cfgPriorityFee').value,
+        maxBuysPerToken: document.getElementById('cfgMaxBuys').value,
+        dryRun: document.getElementById('cfgDryRun').checked,
+        watchedCreators: document.getElementById('cfgWatchedCreators').value,
+        blacklistedTokens: document.getElementById('cfgBlacklistedTokens').value,
+    };
+    const pk = document.getElementById('cfgPrivateKey').value;
+    if (pk && !pk.includes('...')) body.privateKey = pk;
+
+    const res = await fetch('/api/pumpswap/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    logEvent('info', d.ok ? 'Config saved' : 'Config save failed: ' + d.error);
+}
+
+async function startSniper() {
+    const res = await fetch('/api/pumpswap/start', { method: 'POST' });
+    const d = await res.json();
+    if (!d.ok) logEvent('error', 'Start failed: ' + d.error);
+    pollStatus();
+}
+
+async function stopSniper() {
+    await fetch('/api/pumpswap/stop', { method: 'POST' });
+    pollStatus();
+}
+
+async function refreshBalance() {
+    pollStatus();
+    logEvent('info', 'Balance refreshed');
+}
+
+function togglePK() {
+    const el = document.getElementById('cfgPrivateKey');
+    const btn = el.nextElementSibling;
+    if (el.type === 'password') { el.type = 'text'; btn.textContent = 'hide'; }
+    else { el.type = 'password'; btn.textContent = 'show'; }
+}
+
+function updateDryRunLabel() {
+    const on = document.getElementById('cfgDryRun').checked;
+    document.getElementById('dryRunLabel').innerHTML = on
+        ? 'ON &mdash; no real transactions'
+        : 'OFF &mdash; LIVE trading';
+}
+document.getElementById('cfgDryRun').addEventListener('change', updateDryRunLabel);
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+connectWS();
+loadConfig();
+pollStatus();
+setInterval(pollStatus, 3000);
+</script>
+</body>
+</html>

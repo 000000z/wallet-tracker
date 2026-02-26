@@ -4,11 +4,13 @@ const path = require("path");
 const fs = require("fs");
 const { ethers } = require("ethers");
 const { WebSocketServer } = require("ws");
+const pumpswap = require("./pumpswap");
 
 // ─── Express + HTTP + WebSocket Setup ────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
+const wssPump = new WebSocketServer({ server, path: "/ws-pump" });
 
 app.use(express.json());
 
@@ -735,13 +737,47 @@ app.get("/api/sniper/history", (req, res) => {
   res.json(buyHistory);
 });
 
-// ─── WebSocket (with heartbeat to prevent Railway proxy timeout) ─────────────
+// ─── PumpSwap API Routes ─────────────────────────────────────────────────────
+pumpswap.init((entry) => {
+  const payload = JSON.stringify(entry);
+  for (const client of wssPump.clients) {
+    if (client.readyState === 1) client.send(payload);
+  }
+});
+
+app.post("/api/pumpswap/start", async (req, res) => {
+  try { await pumpswap.startSniper(); res.json({ ok: true, status: "running" }); }
+  catch (err) { res.json({ ok: false, error: err.message }); }
+});
+
+app.post("/api/pumpswap/stop", (req, res) => {
+  pumpswap.stopSniper();
+  res.json({ ok: true, status: "stopped" });
+});
+
+app.get("/api/pumpswap/status", async (req, res) => {
+  res.json(await pumpswap.getStatusWithBalance());
+});
+
+app.get("/api/pumpswap/config", (req, res) => {
+  res.json(pumpswap.getConfig());
+});
+
+app.post("/api/pumpswap/config", (req, res) => {
+  pumpswap.updateConfig(req.body);
+  res.json({ ok: true, config: pumpswap.getConfig() });
+});
+
+app.get("/api/pumpswap/history", (req, res) => {
+  res.json(pumpswap.getHistory());
+});
+
+// ─── WebSocket: Clanker (with heartbeat to prevent Railway proxy timeout) ────
 wss.on("connection", (ws) => {
-  console.log("WebSocket client connected");
+  console.log("WebSocket client connected (Clanker)");
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
 
-  // Replay last 200 log entries so returning clients see history
   for (const entry of logBuffer) {
     ws.send(JSON.stringify(entry));
   }
@@ -753,12 +789,32 @@ wss.on("connection", (ws) => {
   }));
 });
 
+// ─── WebSocket: PumpSwap ─────────────────────────────────────────────────────
+wssPump.on("connection", (ws) => {
+  console.log("WebSocket client connected (PumpSwap)");
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
+  for (const entry of pumpswap.getLogBuffer()) {
+    ws.send(JSON.stringify(entry));
+  }
+
+  const status = pumpswap.getStatus();
+  ws.send(JSON.stringify({
+    type: "info",
+    msg: `Connected to PumpSwap sniper. Status: ${status.running ? "Running" : "Stopped"}`,
+    ts: new Date().toISOString(),
+  }));
+});
+
 // Ping every 25s to keep connections alive through Railway's proxy
 const heartbeat = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (!ws.isAlive) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
+  [wss, wssPump].forEach(server => {
+    server.clients.forEach((ws) => {
+      if (!ws.isAlive) return ws.terminate();
+      ws.isAlive = false;
+      ws.ping();
+    });
   });
 }, 25000);
 wss.on("close", () => clearInterval(heartbeat));
@@ -767,6 +823,7 @@ wss.on("close", () => clearInterval(heartbeat));
 function shutdown() {
   console.log("\nShutting down...");
   stopSniper();
+  pumpswap.stopSniper();
   server.close();
   process.exit(0);
 }
