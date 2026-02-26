@@ -16,6 +16,7 @@ app.use(express.json());
 const AUTH_USER = process.env.AUTH_USER || "";
 const AUTH_PASS = process.env.AUTH_PASS || "";
 
+console.log(`Auth enabled: ${!!(AUTH_USER && AUTH_PASS)} (user=${AUTH_USER ? "set" : "empty"}, pass=${AUTH_PASS ? "set" : "empty"})`);
 if (AUTH_USER && AUTH_PASS) {
   app.use((req, res, next) => {
     const auth = req.headers.authorization;
