@@ -309,13 +309,27 @@ async function executeBuy(tokenAddress, poolKey) {
   const router = new ethers.Contract(ADDRESSES.universalRouter, UNIVERSAL_ROUTER_ABI, wallet);
 
   try {
+    // Get current gas prices and add priority fee for faster inclusion
+    const feeData = await provider.getFeeData();
+    const maxPriorityFee = feeData.maxPriorityFeePerGas
+      ? feeData.maxPriorityFeePerGas * 2n  // 2x priority to beat others
+      : ethers.parseUnits("0.1", "gwei");
+    const maxFee = feeData.maxFeePerGas
+      ? feeData.maxFeePerGas + maxPriorityFee
+      : undefined;
+
+    log("info", `  Gas: maxPriorityFee=${ethers.formatUnits(maxPriorityFee, "gwei")} gwei`);
+
     const tx = await router.execute(commands, inputs, deadline, {
-      value: amountIn, gasLimit: GAS_LIMIT,
+      value: amountIn,
+      gasLimit: GAS_LIMIT,
+      maxPriorityFeePerGas: maxPriorityFee,
+      maxFeePerGas: maxFee,
     });
     log("buy", `TX sent: ${tx.hash}`);
     log("info", "  Waiting for confirmation...");
 
-    const receipt = await tx.wait();
+    const receipt = await tx.wait(1, 30000); // 1 confirmation, 30s timeout
     log("buy", `TX confirmed in block ${receipt.blockNumber}, gas: ${receipt.gasUsed.toString()}`);
     log("buy", `BaseScan: https://basescan.org/tx/${tx.hash}`);
 
