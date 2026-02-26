@@ -143,11 +143,10 @@ async function resolvePoolKey(tokenAddress, amountIn) {
   const tokenLower = tokenAddress.toLowerCase();
   if (poolKeyCache.has(tokenLower)) return poolKeyCache.get(tokenLower);
 
-  // Sort token pair (V4 requires currency0 < currency1)
-  const wethLower = WETH_BASE.toLowerCase();
-  const [currency0, currency1] = tokenLower < wethLower
-    ? [tokenAddress, WETH_BASE]
-    : [WETH_BASE, tokenAddress];
+  // Clanker V4 pools use native ETH (address(0)), not WETH
+  // address(0) is always < any token address, so currency0 = ZeroAddress
+  const currency0 = ethers.ZeroAddress;
+  const currency1 = tokenAddress;
 
   // Strategy 1: Known hook probing via quoter (no log queries needed)
   log("info", "  Trying known hooks via quoter...");
@@ -382,11 +381,15 @@ async function processClaim(event) {
     log("claim", `CLAIM DETECTED: Token=${token} Owner=${feeOwner}`);
   }
 
-  log("claim", `  Claim Amount: ${amountClaimed.toString()} wei (${ethers.formatEther(amountClaimed)} ETH)`);
+  if (isWethClaim) {
+    log("claim", `  Claim Amount: ${ethers.formatEther(amountClaimed)} ETH`);
+  } else {
+    log("claim", `  Claim Amount: ${ethers.formatUnits(amountClaimed, 18)} tokens`);
+  }
 
-  // Filter: min claim
-  if (amountClaimed < BigInt(config.minClaimAmountWei)) {
-    log("skip", `  SKIP: Claim below minimum (${config.minClaimAmountWei} wei)`);
+  // Filter: min claim (only applies to WETH claims — token amounts aren't comparable)
+  if (isWethClaim && amountClaimed < BigInt(config.minClaimAmountWei)) {
+    log("skip", `  SKIP: Claim below minimum (${ethers.formatEther(BigInt(config.minClaimAmountWei))} ETH)`);
     return;
   }
 
