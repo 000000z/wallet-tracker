@@ -11,6 +11,25 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 app.use(express.json());
+
+// ─── Basic Auth ──────────────────────────────────────────────────────────────
+const AUTH_USER = process.env.AUTH_USER || "";
+const AUTH_PASS = process.env.AUTH_PASS || "";
+
+if (AUTH_USER && AUTH_PASS) {
+  app.use((req, res, next) => {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith("Basic ")) {
+      res.set("WWW-Authenticate", 'Basic realm="Sniper"');
+      return res.status(401).send("Login required");
+    }
+    const [user, pass] = Buffer.from(auth.slice(6), "base64").toString().split(":");
+    if (user === AUTH_USER && pass === AUTH_PASS) return next();
+    res.set("WWW-Authenticate", 'Basic realm="Sniper"');
+    res.status(401).send("Invalid credentials");
+  });
+}
+
 app.use(express.static(__dirname));
 
 // ─── Constants (Base chain — Clanker) ────────────────────────────────────────
