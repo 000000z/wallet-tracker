@@ -459,6 +459,76 @@ async function processClaim(event) {
 }
 
 // ─── Poll Loop ───────────────────────────────────────────────────────────────
+// ─── WebSocket Event Subscription (near-instant detection) ──────────────────
+let wsProvider = null;
+let wsFeeLocker = null;
+
+function rpcToWs(rpcUrl) {
+  // Convert HTTP RPC URL to WebSocket URL
+  // Alchemy: https://base-mainnet.g.alchemy.com/v2/KEY → wss://base-mainnet.g.alchemy.com/v2/KEY
+  return rpcUrl.replace(/^https?:\/\//, "wss://");
+}
+
+async function setupEventListener() {
+  const wsUrl = rpcToWs(config.rpcUrl);
+  log("info", `Connecting WebSocket to RPC for live events...`);
+
+  try {
+    wsProvider = new ethers.WebSocketProvider(wsUrl);
+    wsFeeLocker = new ethers.Contract(ADDRESSES.feeLocker, FEE_LOCKER_ABI, wsProvider);
+
+    // Subscribe to ClaimTokens events in real-time
+    await wsFeeLocker.on("ClaimTokens", async (feeOwner, token, amountClaimed, event) => {
+      if (!sniperRunning) return;
+      try {
+        const blockNum = event.log.blockNumber;
+        log("info", `Claim detected in block ${blockNum} (live)`);
+        lastBlock = blockNum;
+        await processClaim({ args: { feeOwner, token, amountClaimed }, transactionHash: event.log.transactionHash });
+        saveState();
+      } catch (err) {
+        log("error", `Error processing claim: ${err.message}`);
+      }
+    });
+
+    // Handle WebSocket disconnect — fall back to polling
+    wsProvider.websocket.on("close", () => {
+      if (!sniperRunning) return;
+      log("error", "RPC WebSocket disconnected — falling back to polling");
+      startPolling();
+    });
+
+    wsProvider.websocket.on("error", (err) => {
+      log("error", `RPC WebSocket error: ${err.message}`);
+    });
+
+    log("info", "Live event subscription active (near-instant detection)");
+    return true;
+  } catch (err) {
+    log("error", `WebSocket subscription failed: ${err.message}`);
+    log("info", "Falling back to polling mode");
+    return false;
+  }
+}
+
+function teardownEventListener() {
+  if (wsFeeLocker) {
+    wsFeeLocker.removeAllListeners();
+    wsFeeLocker = null;
+  }
+  if (wsProvider) {
+    wsProvider.destroy();
+    wsProvider = null;
+  }
+}
+
+// ─── Polling Fallback ───────────────────────────────────────────────────────
+function startPolling() {
+  if (pollTimer) return; // already polling
+  log("info", `Polling fallback active (every ${config.pollIntervalMs}ms)`);
+  pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
+}
+
 async function pollOnce() {
   if (!sniperRunning) return;
 
@@ -503,7 +573,7 @@ async function startSniper() {
   log("info", "═══ Clanker Claim Sniper Starting ═══");
   log("info", `RPC: ${config.rpcUrl}`);
   log("info", `Buy: ${config.buyAmountEth} ETH | Slippage: ${config.slippagePct}%`);
-  log("info", `Dry Run: ${config.dryRun} | Poll: ${config.pollIntervalMs}ms`);
+  log("info", `Dry Run: ${config.dryRun} | Mode: WebSocket (polling fallback: ${config.pollIntervalMs}ms)`);
 
   provider = new ethers.JsonRpcProvider(config.rpcUrl);
   wallet = new ethers.Wallet(config.privateKey, provider);
@@ -525,11 +595,17 @@ async function startSniper() {
   log("info", "Listening for ClaimTokens events...");
 
   sniperRunning = true;
-  pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
+
+  // Try WebSocket subscription first, fall back to polling
+  const wsOk = await setupEventListener();
+  if (!wsOk) {
+    startPolling();
+  }
 }
 
 function stopSniper() {
   sniperRunning = false;
+  teardownEventListener();
   if (pollTimer) {
     clearTimeout(pollTimer);
     pollTimer = null;
