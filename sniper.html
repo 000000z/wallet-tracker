@@ -430,6 +430,8 @@ const KNOWN_HOOKS = [
     { addr: '0xDd5EeaFff7BD481AD55Db083062b13a3cdf0A68CC', fee: '10000',   label: 'Static v4.0' },
 ];
 
+const WETH_BASE = '0x4200000000000000000000000000000000000006';
+
 const TICK_SPACING = 200;
 const GAS_LIMIT = 500000n;
 const V4_SWAP_CMD = 0x10;
@@ -832,6 +834,28 @@ async function executeBuy(tokenAddress, poolKey) {
     }
 }
 
+// ─── Resolve creator's actual token from factory ────────────────────────────
+const creatorTokenCache = new Map();
+
+async function resolveCreatorToken(feeOwner) {
+    const ownerLower = feeOwner.toLowerCase();
+    if (creatorTokenCache.has(ownerLower)) return creatorTokenCache.get(ownerLower);
+
+    try {
+        const filter = factory.filters.TokenCreated(null, feeOwner);
+        const events = await factory.queryFilter(filter, 0, 'latest');
+        if (events.length > 0) {
+            // Return the most recent token this creator deployed
+            const tokenAddr = events[events.length - 1].args.tokenAddress;
+            creatorTokenCache.set(ownerLower, tokenAddr);
+            return tokenAddr;
+        }
+    } catch (err) {
+        logEvent('error', '  Creator token lookup failed: ' + err.message);
+    }
+    return null;
+}
+
 // ─── Process Claim (ported from sniper.js) ──────────────────────────────────
 async function processClaim(event) {
     const { feeOwner, token, amountClaimed } = event.args;
@@ -840,10 +864,27 @@ async function processClaim(event) {
     claimsDetected++;
     $claims.textContent = claimsDetected;
 
-    logEvent('claim', 'CLAIM DETECTED:');
-    logEvent('claim', '  Fee Owner: ' + feeOwner);
-    logEvent('claim', '  Token: ' + token);
-    logEvent('claim', '  Amount: ' + amountClaimed.toString() + ' wei (' + ethers.formatEther(amountClaimed) + ' ETH)');
+    // Determine the actual token to buy
+    let buyToken = token;
+    const isWethClaim = token.toLowerCase() === WETH_BASE.toLowerCase();
+
+    if (isWethClaim) {
+        logEvent('claim', 'WETH FEE CLAIM from ' + feeOwner.slice(0, 10) + '... (' + ethers.formatEther(amountClaimed) + ' ETH)');
+        logEvent('info', '  Resolving creator\'s actual token...');
+        const actualToken = await resolveCreatorToken(feeOwner);
+        if (!actualToken) {
+            logEvent('skip', '  SKIP: Could not find token for creator ' + feeOwner.slice(0, 10) + '...');
+            return;
+        }
+        buyToken = actualToken;
+        logEvent('claim', '  Resolved token: ' + buyToken);
+    } else {
+        logEvent('claim', 'CLAIM DETECTED:');
+        logEvent('claim', '  Fee Owner: ' + feeOwner);
+        logEvent('claim', '  Token: ' + token);
+    }
+
+    logEvent('claim', '  Claim Amount: ' + amountClaimed.toString() + ' wei (' + ethers.formatEther(amountClaimed) + ' ETH)');
 
     // Filter: min claim
     if (amountClaimed < BigInt(config.minClaimAmountWei)) {
@@ -854,9 +895,9 @@ async function processClaim(event) {
     // Filter: watched tokens
     const watchedList = config.watchedTokens.split('\n').map(s => s.trim()).filter(Boolean);
     if (watchedList.length > 0) {
-        const isWatched = watchedList.some(w => w.toLowerCase() === token.toLowerCase());
+        const isWatched = watchedList.some(w => w.toLowerCase() === buyToken.toLowerCase());
         if (!isWatched) {
-            logEvent('skip', '  SKIP: Token not in watched list');
+            logEvent('skip', '  SKIP: Token ' + buyToken.slice(0, 10) + '... not in watched list');
             return;
         }
     }
@@ -864,37 +905,37 @@ async function processClaim(event) {
     // Filter: blacklist
     const blacklist = config.blacklistedTokens.split('\n').map(s => s.trim()).filter(Boolean);
     if (blacklist.length > 0) {
-        const isBlacklisted = blacklist.some(b => b.toLowerCase() === token.toLowerCase());
+        const isBlacklisted = blacklist.some(b => b.toLowerCase() === buyToken.toLowerCase());
         if (isBlacklisted) {
-            logEvent('skip', '  SKIP: Token is blacklisted');
+            logEvent('skip', '  SKIP: Token ' + buyToken.slice(0, 10) + '... is blacklisted');
             return;
         }
     }
 
     // Filter: max buys
-    const buyCount = boughtTokens.get(token.toLowerCase()) || 0;
+    const buyCount = boughtTokens.get(buyToken.toLowerCase()) || 0;
     if (buyCount >= config.maxBuysPerToken) {
-        logEvent('skip', '  SKIP: Already bought ' + buyCount + 'x (max: ' + config.maxBuysPerToken + ')');
+        logEvent('skip', '  SKIP: Already bought ' + buyToken.slice(0, 10) + '... ' + buyCount + 'x (max: ' + config.maxBuysPerToken + ')');
         return;
     }
 
     // Resolve pool
     const amountIn = ethers.parseEther(config.buyAmountEth);
-    const poolKey = await resolvePoolKey(token, amountIn);
+    const poolKey = await resolvePoolKey(buyToken, amountIn);
     if (!poolKey) {
-        logEvent('error', '  SKIP: Could not resolve pool for ' + token);
+        logEvent('error', '  SKIP: Could not resolve pool for ' + buyToken);
         return;
     }
 
     // Execute buy
-    logEvent('info', '  BUYING ' + token.slice(0, 10) + '... with ' + config.buyAmountEth + ' ETH...');
-    const result = await executeBuy(token, poolKey);
+    logEvent('info', '  BUYING ' + buyToken.slice(0, 10) + '... with ' + config.buyAmountEth + ' ETH...');
+    const result = await executeBuy(buyToken, poolKey);
 
     if (result) {
-        boughtTokens.set(token.toLowerCase(), buyCount + 1);
+        boughtTokens.set(buyToken.toLowerCase(), buyCount + 1);
         buysExecuted++;
         $buys.textContent = buysExecuted;
-        logEvent('buy', 'BUY COMPLETE for ' + token.slice(0, 10) + '...');
+        logEvent('buy', 'BUY COMPLETE for ' + buyToken.slice(0, 10) + '...');
     }
 }
 
