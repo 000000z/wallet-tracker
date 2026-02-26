@@ -834,24 +834,30 @@ async function executeBuy(tokenAddress, poolKey) {
     }
 }
 
-// ─── Resolve creator's actual token from factory ────────────────────────────
-const creatorTokenCache = new Map();
+// ─── Resolve actual token from the same TX receipt ──────────────────────────
+const claimTokenTopic = ethers.id('ClaimTokens(address,address,uint256)');
 
-async function resolveCreatorToken(feeOwner) {
-    const ownerLower = feeOwner.toLowerCase();
-    if (creatorTokenCache.has(ownerLower)) return creatorTokenCache.get(ownerLower);
-
+async function resolveTokenFromTx(txHash) {
     try {
-        const filter = factory.filters.TokenCreated(null, feeOwner);
-        const events = await factory.queryFilter(filter, 0, 'latest');
-        if (events.length > 0) {
-            // Return the most recent token this creator deployed
-            const tokenAddr = events[events.length - 1].args.tokenAddress;
-            creatorTokenCache.set(ownerLower, tokenAddr);
-            return tokenAddr;
+        const receipt = await provider.getTransactionReceipt(txHash);
+        if (!receipt) return null;
+
+        // Parse all ClaimTokens logs in this TX
+        const iface = new ethers.Interface(FEE_LOCKER_ABI);
+        for (const log of receipt.logs) {
+            if (log.address.toLowerCase() !== ADDRESSES.feeLocker.toLowerCase()) continue;
+            if (log.topics[0] !== claimTokenTopic) continue;
+            try {
+                const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                const token = parsed.args.token;
+                // Return the first non-WETH token in this TX
+                if (token.toLowerCase() !== WETH_BASE.toLowerCase()) {
+                    return token;
+                }
+            } catch { /* skip unparseable logs */ }
         }
     } catch (err) {
-        logEvent('error', '  Creator token lookup failed: ' + err.message);
+        logEvent('error', '  TX receipt lookup failed: ' + err.message);
     }
     return null;
 }
@@ -870,10 +876,10 @@ async function processClaim(event) {
 
     if (isWethClaim) {
         logEvent('claim', 'WETH FEE CLAIM from ' + feeOwner.slice(0, 10) + '... (' + ethers.formatEther(amountClaimed) + ' ETH)');
-        logEvent('info', '  Resolving creator\'s actual token...');
-        const actualToken = await resolveCreatorToken(feeOwner);
+        logEvent('info', '  Checking TX for actual token...');
+        const actualToken = await resolveTokenFromTx(event.transactionHash);
         if (!actualToken) {
-            logEvent('skip', '  SKIP: Could not find token for creator ' + feeOwner.slice(0, 10) + '...');
+            logEvent('skip', '  SKIP: No token found in TX ' + event.transactionHash.slice(0, 14) + '...');
             return;
         }
         buyToken = actualToken;
