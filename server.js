@@ -263,7 +263,7 @@ function encodeV4Swap(tokenAddress, poolKey, amountIn, amountOutMin) {
 
 // ─── Execute Buy ─────────────────────────────────────────────────────────────
 async function executeBuy(tokenAddress, poolKey) {
-  const amountIn = ethers.parseEther(config.buyAmountEth);
+  let amountIn = ethers.parseEther(config.buyAmountEth);
 
   // Get quote
   let amountOut;
@@ -329,11 +329,16 @@ async function executeBuy(tokenAddress, poolKey) {
       log("info", `  Gas capped at 5% of balance (${ethers.formatEther(maxGasBudget)} ETH)`);
     }
 
-    // Abort if balance can't cover swap + gas
-    const totalCost = amountIn + estimatedGasCost;
-    if (totalCost > balance) {
-      log("error", `  SKIP: Insufficient balance. Need ${ethers.formatEther(totalCost)} ETH, have ${ethers.formatEther(balance)} ETH`);
-      return null;
+    // If balance can't cover swap + gas, reduce swap amount to fit
+    const gasCost = GAS_LIMIT * maxFee;
+    if (amountIn + gasCost > balance) {
+      const adjusted = balance - gasCost;
+      if (adjusted <= 0n) {
+        log("error", `  SKIP: Balance too low to cover gas (${ethers.formatEther(balance)} ETH)`);
+        return null;
+      }
+      log("info", `  All-in: adjusted swap from ${ethers.formatEther(amountIn)} to ${ethers.formatEther(adjusted)} ETH (reserving gas)`);
+      amountIn = adjusted;
     }
 
     log("info", `  Gas: maxFee=${ethers.formatUnits(maxFee, "gwei")} gwei, maxPriority=${ethers.formatUnits(maxPriorityFee, "gwei")} gwei`);
