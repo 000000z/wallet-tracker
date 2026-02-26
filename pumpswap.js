@@ -7,7 +7,7 @@ const bs58 = require("bs58");
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PUMP_AMM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 const POOL_DISC = Buffer.from([241, 154, 109, 4, 17, 177, 109, 188]);
-const COLLECT_FEE_EVENT_DISC = Buffer.from([232, 245, 194, 238, 234, 218, 58, 89]);
+const COLLECT_FEE_EVENT_DISC = Buffer.from([122, 2, 127, 1, 14, 191, 12, 175]);
 const COLLECT_FEE_IX_DISC = Buffer.from([160, 57, 89, 42, 181, 139, 43, 66]);
 const POOL_BASE_MINT_OFFSET = 43;   // 8+1+2+32
 const POOL_COIN_CREATOR_OFFSET = 211; // 8+1+2+32+32+32+32+32+32+8
@@ -333,14 +333,7 @@ async function startSniper() {
       try {
         const data = Buffer.from(logLine.slice(14), "base64");
         if (data.length < 56) continue;
-        const disc = data.slice(0, 8);
-        if (!disc.equals(COLLECT_FEE_EVENT_DISC)) {
-          // Debug: log first non-matching discriminator to help diagnose
-          if (!coinCreator) {
-            log("info", `Event data: len=${data.length}, disc=[${Array.from(disc).join(",")}] (expected [${Array.from(COLLECT_FEE_EVENT_DISC).join(",")}])`);
-          }
-          continue;
-        }
+        if (!data.slice(0, 8).equals(COLLECT_FEE_EVENT_DISC)) continue;
         coinCreator = new PublicKey(data.slice(16, 48));
         feeAmount = data.readBigUInt64LE(48);
         break;
