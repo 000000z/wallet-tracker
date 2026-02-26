@@ -333,7 +333,14 @@ async function startSniper() {
       try {
         const data = Buffer.from(logLine.slice(14), "base64");
         if (data.length < 56) continue;
-        if (!data.slice(0, 8).equals(COLLECT_FEE_EVENT_DISC)) continue;
+        const disc = data.slice(0, 8);
+        if (!disc.equals(COLLECT_FEE_EVENT_DISC)) {
+          // Debug: log first non-matching discriminator to help diagnose
+          if (!coinCreator) {
+            log("info", `Event data: len=${data.length}, disc=[${Array.from(disc).join(",")}] (expected [${Array.from(COLLECT_FEE_EVENT_DISC).join(",")}])`);
+          }
+          continue;
+        }
         coinCreator = new PublicKey(data.slice(16, 48));
         feeAmount = data.readBigUInt64LE(48);
         break;
