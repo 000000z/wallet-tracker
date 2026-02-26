@@ -78,31 +78,84 @@ function saveState() {
   }
 }
 
-// ─── Find pools by creator (getProgramAccounts) ─────────────────────────────
-const creatorPoolCache = new Map();
+// ─── Creator Map (pre-built at startup) ──────────────────────────────────────
+// Maps coin_creator address → [token mints] so claim lookups are instant
+const creatorToTokens = new Map();
 
-async function findPoolsByCreator(coinCreator) {
-  const key = coinCreator.toBase58();
-  if (creatorPoolCache.has(key)) return creatorPoolCache.get(key);
-
+async function resolvePoolForToken(tokenMint) {
+  // Use DexScreener to find the pool address for this token (free, no RPC credits)
   try {
-    const accounts = await connection.getProgramAccounts(PUMP_AMM, {
-      filters: [
-        { memcmp: { offset: 0, bytes: bs58.encode(POOL_DISC) } },
-        { memcmp: { offset: POOL_COIN_CREATOR_OFFSET, bytes: coinCreator.toBase58() } },
-      ],
-    });
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);
+    if (!res.ok) throw new Error(`DexScreener HTTP ${res.status}`);
+    const data = await res.json();
 
-    const pools = accounts.map(({ pubkey, account }) => {
-      const baseMint = new PublicKey(account.data.slice(POOL_BASE_MINT_OFFSET, POOL_BASE_MINT_OFFSET + 32));
-      return { pool: pubkey, baseMint };
-    });
+    // Find the PumpSwap pair
+    const pair = (data.pairs || []).find(p =>
+      p.dexId === 'pumpswap' || p.labels?.includes('pump') ||
+      p.url?.includes('pump') || p.dexId?.includes('pump')
+    );
 
-    if (pools.length > 0) creatorPoolCache.set(key, pools);
-    return pools;
+    if (pair && pair.pairAddress) {
+      const poolPubkey = new PublicKey(pair.pairAddress);
+      const poolAccount = await connection.getAccountInfo(poolPubkey);
+      if (poolAccount && poolAccount.data.length >= POOL_COIN_CREATOR_OFFSET + 32) {
+        // Verify discriminator
+        if (poolAccount.data.slice(0, 8).equals(POOL_DISC)) {
+          const coinCreator = new PublicKey(poolAccount.data.slice(POOL_COIN_CREATOR_OFFSET, POOL_COIN_CREATOR_OFFSET + 32));
+          return coinCreator.toBase58();
+        }
+      }
+    }
   } catch (err) {
-    log("error", `Pool lookup failed: ${err.message}`);
-    return [];
+    log("error", `DexScreener lookup failed for ${tokenMint}: ${err.message}`);
+  }
+
+  // Fallback: find pool via token's largest holder (pool holds most of supply)
+  try {
+    log("info", `Trying token largest accounts fallback for ${tokenMint}...`);
+    const mintPubkey = new PublicKey(tokenMint);
+    const result = await connection.getTokenLargestAccounts(mintPubkey);
+    if (result.value && result.value.length > 0) {
+      // Check top accounts — the pool's token account is owned by the pool PDA
+      for (const account of result.value.slice(0, 5)) {
+        const tokenAcct = await connection.getParsedAccountInfo(new PublicKey(account.address));
+        if (!tokenAcct.value || !tokenAcct.value.data?.parsed) continue;
+        const owner = tokenAcct.value.data.parsed.info.owner;
+        // Check if owner is a PumpSwap pool
+        const poolAccount = await connection.getAccountInfo(new PublicKey(owner));
+        if (poolAccount && poolAccount.owner.equals(PUMP_AMM) &&
+            poolAccount.data.length >= POOL_COIN_CREATOR_OFFSET + 32 &&
+            poolAccount.data.slice(0, 8).equals(POOL_DISC)) {
+          const coinCreator = new PublicKey(poolAccount.data.slice(POOL_COIN_CREATOR_OFFSET, POOL_COIN_CREATOR_OFFSET + 32));
+          return coinCreator.toBase58();
+        }
+      }
+    }
+  } catch (err) {
+    log("error", `Fallback pool lookup failed for ${tokenMint}: ${err.message}`);
+  }
+
+  return null;
+}
+
+async function buildCreatorMap() {
+  creatorToTokens.clear();
+  log("info", `Resolving creators for ${config.watchedTokens.length} watched token(s)...`);
+
+  for (const tokenMint of config.watchedTokens) {
+    const creator = await resolvePoolForToken(tokenMint);
+    if (creator) {
+      if (!creatorToTokens.has(creator)) creatorToTokens.set(creator, []);
+      creatorToTokens.get(creator).push(tokenMint);
+      log("info", `  ${tokenMint} → creator: ${creator}`);
+    } else {
+      log("error", `  ${tokenMint} → FAILED to resolve creator (token may not be on PumpSwap)`);
+    }
+  }
+
+  log("info", `Creator map ready: ${creatorToTokens.size} creator(s) → ${config.watchedTokens.length} token(s)`);
+  if (creatorToTokens.size === 0) {
+    throw new Error("Could not resolve any watched tokens to creators. Check token mints.");
   }
 }
 
@@ -210,32 +263,19 @@ async function processClaim(coinCreator, feeAmount, signature) {
   const creatorStr = coinCreator.toBase58();
   const feeSol = Number(feeAmount) / LAMPORTS_PER_SOL;
 
-  log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
-  log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
-
-  // Fee claims are per-creator (not per-token) — all fees from all their tokens
-  // come out at once. We must look up which tokens this creator has pools for.
-  log("info", `Looking up pools for creator ${creatorStr}...`);
-  const pools = await findPoolsByCreator(coinCreator);
-
-  if (pools.length === 0) {
-    log("skip", `SKIP: No pools found for creator ${creatorStr}`);
+  // Instant lookup — no RPC calls needed
+  const tokens = creatorToTokens.get(creatorStr);
+  if (!tokens || tokens.length === 0) {
+    // Not a creator we care about — skip silently (this is the common case)
     return;
   }
 
-  log("info", `Found ${pools.length} pool(s) for creator`);
+  log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
+  log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
+  log("info", `Creator matches watched token(s): ${tokens.join(", ")}`);
 
-  for (const { baseMint, pool } of pools) {
-    const mintStr = baseMint.toBase58();
-    log("info", `Token: ${mintStr} | Pool: ${pool.toBase58()}`);
-
-    if (!config.watchedTokens.some(w => w === mintStr)) {
-      log("skip", `SKIP: Token ${mintStr} not in watched list`);
-      continue;
-    }
-
-    log("info", `Token ${mintStr} matches watched list — buying`);
-    await executeBuy(baseMint);
+  for (const tokenMint of tokens) {
+    await executeBuy(new PublicKey(tokenMint));
   }
 }
 
@@ -270,6 +310,9 @@ async function startSniper() {
   log("info", `Wallet: ${keypair.publicKey.toBase58()}`);
   log("info", `Balance: ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
   if (balance === 0) log("error", "WARNING: Wallet has 0 SOL — buys will fail");
+
+  // Pre-build creator map: token mint → coin_creator (one-time at startup)
+  await buildCreatorMap();
 
   log("info", "Subscribing to PumpSwap program logs...");
 
