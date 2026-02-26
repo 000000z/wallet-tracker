@@ -129,8 +129,9 @@
     </div>
   </div>
   <div>
-    <label>Watched Tokens (one per line, empty = all)</label>
-    <textarea id="cfgWatchedTokens" placeholder="TokenMint1&#10;TokenMint2"></textarea>
+    <label>Watched Tokens (required, one per line)</label>
+    <textarea id="cfgWatchedTokens" placeholder="TokenMint1&#10;TokenMint2" required></textarea>
+    <div class="hint">Token mint addresses to snipe when their creator claims fees</div>
   </div>
   <div>
     <label>Blacklisted Tokens (one per line)</label>

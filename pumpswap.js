@@ -229,14 +229,12 @@ async function processClaim(coinCreator, feeAmount, signature) {
     const mintStr = baseMint.toBase58();
     log("info", `Token: ${mintStr} | Pool: ${pool.toBase58()}`);
 
-    // Filter: only buy tokens in the watched list (if set)
-    if (config.watchedTokens.length > 0) {
-      if (!config.watchedTokens.some(w => w === mintStr)) {
-        log("skip", `SKIP: Token ${mintStr} not in watched list`);
-        continue;
-      }
+    if (!config.watchedTokens.some(w => w === mintStr)) {
+      log("skip", `SKIP: Token ${mintStr} not in watched list`);
+      continue;
     }
 
+    log("info", `Token ${mintStr} matches watched list — buying`);
     await executeBuy(baseMint);
   }
 }
@@ -249,6 +247,9 @@ async function startSniper() {
   }
   if (!config.rpcUrl) {
     throw new Error("RPC URL not configured. Set PUMP_RPC_URL env var.");
+  }
+  if (config.watchedTokens.length === 0) {
+    throw new Error("Watched Tokens list is empty. Add at least one token mint to watch.");
   }
 
   log("info", "=== PumpSwap Claim Sniper Starting ===");
