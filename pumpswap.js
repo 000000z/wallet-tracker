@@ -39,7 +39,7 @@ let config = {
   priorityFeeSol:   parseFloat(process.env.PUMP_PRIORITY_FEE_SOL || "0.005"),
   maxBuysPerToken:  parseInt(process.env.PUMP_MAX_BUYS_PER_TOKEN || "1", 10),
   dryRun:           (process.env.PUMP_DRY_RUN || "true") === "true",
-  watchedCreators:  (process.env.PUMP_WATCHED_CREATORS || "").split(",").map(s => s.trim()).filter(Boolean),
+  watchedTokens:    (process.env.PUMP_WATCHED_TOKENS || "").split(",").map(s => s.trim()).filter(Boolean),
   blacklistedTokens: (process.env.PUMP_BLACKLISTED_TOKENS || "").split(",").map(s => s.trim()).filter(Boolean),
 };
 
@@ -212,13 +212,6 @@ async function processClaim(coinCreator, feeAmount, signature) {
   log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
 
-  if (config.watchedCreators.length > 0) {
-    if (!config.watchedCreators.some(w => w === creatorStr)) {
-      log("skip", `SKIP: Creator ${creatorStr} not in watched list`);
-      return;
-    }
-  }
-
   log("info", `Looking up pools for creator ${creatorStr}...`);
   const pools = await findPoolsByCreator(coinCreator);
 
@@ -229,7 +222,17 @@ async function processClaim(coinCreator, feeAmount, signature) {
 
   log("info", `Found ${pools.length} pool(s) for creator`);
   for (const { baseMint, pool } of pools) {
-    log("info", `Token: ${baseMint.toBase58()} | Pool: ${pool.toBase58()}`);
+    const mintStr = baseMint.toBase58();
+    log("info", `Token: ${mintStr} | Pool: ${pool.toBase58()}`);
+
+    // Filter: only buy tokens in the watched list (if set)
+    if (config.watchedTokens.length > 0) {
+      if (!config.watchedTokens.some(w => w === mintStr)) {
+        log("skip", `SKIP: Token ${mintStr} not in watched list`);
+        continue;
+      }
+    }
+
     await executeBuy(baseMint);
   }
 }
@@ -388,9 +391,9 @@ function updateConfig(body) {
   if (body.priorityFeeSol !== undefined) config.priorityFeeSol = parseFloat(body.priorityFeeSol);
   if (body.maxBuysPerToken !== undefined) config.maxBuysPerToken = parseInt(body.maxBuysPerToken, 10);
   if (body.dryRun !== undefined) config.dryRun = body.dryRun === true || body.dryRun === "true";
-  if (body.watchedCreators !== undefined) {
-    config.watchedCreators = Array.isArray(body.watchedCreators)
-      ? body.watchedCreators : body.watchedCreators.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+  if (body.watchedTokens !== undefined) {
+    config.watchedTokens = Array.isArray(body.watchedTokens)
+      ? body.watchedTokens : body.watchedTokens.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
   }
   if (body.blacklistedTokens !== undefined) {
     config.blacklistedTokens = Array.isArray(body.blacklistedTokens)

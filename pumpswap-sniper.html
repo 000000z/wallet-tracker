@@ -129,8 +129,8 @@
     </div>
   </div>
   <div>
-    <label>Watched Creators (one per line, empty = all)</label>
-    <textarea id="cfgWatchedCreators" placeholder="Creator1PublicKey&#10;Creator2PublicKey"></textarea>
+    <label>Watched Tokens (one per line, empty = all)</label>
+    <textarea id="cfgWatchedTokens" placeholder="TokenMint1&#10;TokenMint2"></textarea>
   </div>
   <div>
     <label>Blacklisted Tokens (one per line)</label>
@@ -226,7 +226,7 @@ async function loadConfig() {
         document.getElementById('cfgMaxBuys').value = c.maxBuysPerToken || '';
         document.getElementById('cfgDryRun').checked = c.dryRun;
         updateDryRunLabel();
-        document.getElementById('cfgWatchedCreators').value = (c.watchedCreators || []).join('\n');
+        document.getElementById('cfgWatchedTokens').value = (c.watchedTokens || []).join('\n');
         document.getElementById('cfgBlacklistedTokens').value = (c.blacklistedTokens || []).join('\n');
     } catch {}
 }
@@ -240,7 +240,7 @@ async function saveConfig() {
         priorityFeeSol: document.getElementById('cfgPriorityFee').value,
         maxBuysPerToken: document.getElementById('cfgMaxBuys').value,
         dryRun: document.getElementById('cfgDryRun').checked,
-        watchedCreators: document.getElementById('cfgWatchedCreators').value,
+        watchedTokens: document.getElementById('cfgWatchedTokens').value,
         blacklistedTokens: document.getElementById('cfgBlacklistedTokens').value,
     };
     const pk = document.getElementById('cfgPrivateKey').value;
