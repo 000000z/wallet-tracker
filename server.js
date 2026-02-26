@@ -274,7 +274,7 @@ async function executeBuy(tokenAddress, poolKey) {
   const buyCount = (boughtTokens.get(tokenAddress.toLowerCase()) || 0) + 1;
 
   if (config.dryRun) {
-    log("buy", `DRY RUN: Would buy ${tokenAddress.slice(0, 10)}... with ${config.buyAmountEth} ETH, ~${amountOut.toString()} tokens`);
+    log("buy", `DRY RUN: Would buy ${tokenAddress}... with ${config.buyAmountEth} ETH, ~${amountOut.toString()} tokens`);
     const entry = {
       token: tokenAddress, buyCount, amountIn: config.buyAmountEth,
       amountOut: amountOut.toString(), txHash: "", dryRun: true, time: Date.now(),
@@ -369,11 +369,11 @@ async function processClaim(event) {
   const isWethClaim = token.toLowerCase() === WETH_BASE.toLowerCase();
 
   if (isWethClaim) {
-    log("claim", `WETH FEE CLAIM from ${feeOwner.slice(0, 10)}... (${ethers.formatEther(amountClaimed)} ETH)`);
+    log("claim", `WETH FEE CLAIM from ${feeOwner}... (${ethers.formatEther(amountClaimed)} ETH)`);
     log("info", "  Checking TX for actual token...");
     const actualToken = await resolveTokenFromTx(event.transactionHash);
     if (!actualToken) {
-      log("skip", `  SKIP: No token found in TX ${event.transactionHash.slice(0, 14)}...`);
+      log("skip", `  SKIP: No token found in TX ${event.transactionHash}...`);
       return;
     }
     buyToken = actualToken;
@@ -394,7 +394,7 @@ async function processClaim(event) {
   if (config.watchedTokens.length > 0) {
     const isWatched = config.watchedTokens.some(w => w.toLowerCase() === buyToken.toLowerCase());
     if (!isWatched) {
-      log("skip", `  SKIP: Token ${buyToken.slice(0, 10)}... not in watched list`);
+      log("skip", `  SKIP: Token ${buyToken}... not in watched list`);
       return;
     }
   }
@@ -403,7 +403,7 @@ async function processClaim(event) {
   if (config.blacklistedTokens.length > 0) {
     const isBlacklisted = config.blacklistedTokens.some(b => b.toLowerCase() === buyToken.toLowerCase());
     if (isBlacklisted) {
-      log("skip", `  SKIP: Token ${buyToken.slice(0, 10)}... is blacklisted`);
+      log("skip", `  SKIP: Token ${buyToken}... is blacklisted`);
       return;
     }
   }
@@ -411,7 +411,7 @@ async function processClaim(event) {
   // Filter: max buys
   const buyCount = boughtTokens.get(buyToken.toLowerCase()) || 0;
   if (buyCount >= config.maxBuysPerToken) {
-    log("skip", `  SKIP: Already bought ${buyToken.slice(0, 10)}... ${buyCount}x (max: ${config.maxBuysPerToken})`);
+    log("skip", `  SKIP: Already bought ${buyToken}... ${buyCount}x (max: ${config.maxBuysPerToken})`);
     return;
   }
 
@@ -424,13 +424,13 @@ async function processClaim(event) {
   }
 
   // Execute buy
-  log("info", `  BUYING ${buyToken.slice(0, 10)}... with ${config.buyAmountEth} ETH...`);
+  log("info", `  BUYING ${buyToken}... with ${config.buyAmountEth} ETH...`);
   const result = await executeBuy(buyToken, poolKey);
 
   if (result) {
     boughtTokens.set(buyToken.toLowerCase(), buyCount + 1);
     buysExecuted++;
-    log("buy", `BUY COMPLETE for ${buyToken.slice(0, 10)}...`);
+    log("buy", `BUY COMPLETE for ${buyToken}...`);
     saveState();
   }
 }
