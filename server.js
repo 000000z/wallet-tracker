@@ -9,8 +9,20 @@ const pumpswap = require("./pumpswap");
 // ─── Express + HTTP + WebSocket Setup ────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
-const wssPump = new WebSocketServer({ server, path: "/ws-pump" });
+const wss = new WebSocketServer({ noServer: true });
+const wssPump = new WebSocketServer({ noServer: true });
+
+// Route WebSocket upgrades by path
+server.on("upgrade", (req, socket, head) => {
+  const { pathname } = new URL(req.url, "http://localhost");
+  if (pathname === "/ws") {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+  } else if (pathname === "/ws-pump") {
+    wssPump.handleUpgrade(req, socket, head, (ws) => wssPump.emit("connection", ws, req));
+  } else {
+    socket.destroy();
+  }
+});
 
 app.use(express.json());
 
