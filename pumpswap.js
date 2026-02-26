@@ -78,38 +78,32 @@ function saveState() {
   }
 }
 
-// ─── Resolve exact token from claim TX ───────────────────────────────────────
-async function resolveClaimToken(signature) {
+// ─── Find pools by creator (getProgramAccounts) ─────────────────────────────
+const creatorPoolCache = new Map();
+
+async function findPoolsByCreator(coinCreator) {
+  const key = coinCreator.toBase58();
+  if (creatorPoolCache.has(key)) return creatorPoolCache.get(key);
+
   try {
-    await new Promise(r => setTimeout(r, 500)); // wait for TX to be indexed
-    const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
-    if (!tx) return null;
+    const accounts = await connection.getProgramAccounts(PUMP_AMM, {
+      filters: [
+        { memcmp: { offset: 0, bytes: bs58.encode(POOL_DISC) } },
+        { memcmp: { offset: POOL_COIN_CREATOR_OFFSET, bytes: coinCreator.toBase58() } },
+      ],
+    });
 
-    const msg = tx.transaction.message;
-    const keys = msg.staticAccountKeys || msg.accountKeys;
-    const pumpAmmStr = PUMP_AMM.toBase58();
+    const pools = accounts.map(({ pubkey, account }) => {
+      const baseMint = new PublicKey(account.data.slice(POOL_BASE_MINT_OFFSET, POOL_BASE_MINT_OFFSET + 32));
+      return { pool: pubkey, baseMint };
+    });
 
-    for (const ix of (msg.compiledInstructions || [])) {
-      const progKey = keys[ix.programIdIndex];
-      if (!progKey || progKey.toBase58() !== pumpAmmStr) continue;
-
-      const ixData = Buffer.from(ix.data);
-      if (ixData.length < 8 || !ixData.slice(0, 8).equals(COLLECT_FEE_IX_DISC)) continue;
-
-      // Account 0 = pool address in collect_coin_creator_fee instruction
-      const poolAddress = keys[ix.accountKeyIndexes[0]];
-
-      // Fetch pool account to get the specific base_mint
-      const poolAccount = await connection.getAccountInfo(poolAddress);
-      if (!poolAccount || poolAccount.data.length < POOL_BASE_MINT_OFFSET + 32) continue;
-
-      const baseMint = new PublicKey(poolAccount.data.slice(POOL_BASE_MINT_OFFSET, POOL_BASE_MINT_OFFSET + 32));
-      return { pool: poolAddress, baseMint };
-    }
+    if (pools.length > 0) creatorPoolCache.set(key, pools);
+    return pools;
   } catch (err) {
-    log("error", `Failed to resolve claim token: ${err.message}`);
+    log("error", `Pool lookup failed: ${err.message}`);
+    return [];
   }
-  return null;
 }
 
 // ─── Execute Buy (PumpPortal Local API) ──────────────────────────────────────
@@ -219,26 +213,32 @@ async function processClaim(coinCreator, feeAmount, signature) {
   log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
 
-  log("info", `Resolving exact token from claim TX...`);
-  const result = await resolveClaimToken(signature);
+  // Fee claims are per-creator (not per-token) — all fees from all their tokens
+  // come out at once. We must look up which tokens this creator has pools for.
+  log("info", `Looking up pools for creator ${creatorStr}...`);
+  const pools = await findPoolsByCreator(coinCreator);
 
-  if (!result) {
-    log("skip", `SKIP: Could not resolve token from TX ${signature}`);
+  if (pools.length === 0) {
+    log("skip", `SKIP: No pools found for creator ${creatorStr}`);
     return;
   }
 
-  const mintStr = result.baseMint.toBase58();
-  log("info", `Claimed token: ${mintStr} | Pool: ${result.pool.toBase58()}`);
+  log("info", `Found ${pools.length} pool(s) for creator`);
 
-  // Filter: only buy tokens in the watched list (if set)
-  if (config.watchedTokens.length > 0) {
-    if (!config.watchedTokens.some(w => w === mintStr)) {
-      log("skip", `SKIP: Token ${mintStr} not in watched list`);
-      return;
+  for (const { baseMint, pool } of pools) {
+    const mintStr = baseMint.toBase58();
+    log("info", `Token: ${mintStr} | Pool: ${pool.toBase58()}`);
+
+    // Filter: only buy tokens in the watched list (if set)
+    if (config.watchedTokens.length > 0) {
+      if (!config.watchedTokens.some(w => w === mintStr)) {
+        log("skip", `SKIP: Token ${mintStr} not in watched list`);
+        continue;
+      }
     }
-  }
 
-  await executeBuy(result.baseMint);
+    await executeBuy(baseMint);
+  }
 }
 
 // ─── Start / Stop ────────────────────────────────────────────────────────────
