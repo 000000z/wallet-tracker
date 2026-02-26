@@ -4,7 +4,14 @@ const path = require("path");
 const fs = require("fs");
 const { ethers } = require("ethers");
 const { WebSocketServer } = require("ws");
-const pumpswap = require("./pumpswap");
+let pumpswap;
+try {
+  pumpswap = require("./pumpswap");
+  console.log("PumpSwap module loaded");
+} catch (err) {
+  console.error("PumpSwap module failed to load:", err.message);
+  pumpswap = null;
+}
 
 // ─── Express + HTTP + WebSocket Setup ────────────────────────────────────────
 const app = express();
@@ -750,37 +757,47 @@ app.get("/api/sniper/history", (req, res) => {
 });
 
 // ─── PumpSwap API Routes ─────────────────────────────────────────────────────
-pumpswap.init((entry) => {
-  const payload = JSON.stringify(entry);
-  for (const client of wssPump.clients) {
-    if (client.readyState === 1) client.send(payload);
-  }
-});
+if (pumpswap) {
+  pumpswap.init((entry) => {
+    const payload = JSON.stringify(entry);
+    for (const client of wssPump.clients) {
+      if (client.readyState === 1) client.send(payload);
+    }
+  });
+}
+
+const pumpNotLoaded = { ok: false, error: "PumpSwap module not loaded (missing @solana/web3.js)" };
 
 app.post("/api/pumpswap/start", async (req, res) => {
+  if (!pumpswap) return res.json(pumpNotLoaded);
   try { await pumpswap.startSniper(); res.json({ ok: true, status: "running" }); }
   catch (err) { res.json({ ok: false, error: err.message }); }
 });
 
 app.post("/api/pumpswap/stop", (req, res) => {
+  if (!pumpswap) return res.json(pumpNotLoaded);
   pumpswap.stopSniper();
   res.json({ ok: true, status: "stopped" });
 });
 
 app.get("/api/pumpswap/status", async (req, res) => {
+  if (!pumpswap) return res.json({ running: false, wallet: "", balance: "", claimsDetected: 0, buysExecuted: 0, error: "Module not loaded" });
   res.json(await pumpswap.getStatusWithBalance());
 });
 
 app.get("/api/pumpswap/config", (req, res) => {
+  if (!pumpswap) return res.json({});
   res.json(pumpswap.getConfig());
 });
 
 app.post("/api/pumpswap/config", (req, res) => {
+  if (!pumpswap) return res.json(pumpNotLoaded);
   pumpswap.updateConfig(req.body);
   res.json({ ok: true, config: pumpswap.getConfig() });
 });
 
 app.get("/api/pumpswap/history", (req, res) => {
+  if (!pumpswap) return res.json([]);
   res.json(pumpswap.getHistory());
 });
 
@@ -807,16 +824,23 @@ wssPump.on("connection", (ws) => {
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
 
-  for (const entry of pumpswap.getLogBuffer()) {
-    ws.send(JSON.stringify(entry));
+  if (pumpswap) {
+    for (const entry of pumpswap.getLogBuffer()) {
+      ws.send(JSON.stringify(entry));
+    }
+    const status = pumpswap.getStatus();
+    ws.send(JSON.stringify({
+      type: "info",
+      msg: `Connected to PumpSwap sniper. Status: ${status.running ? "Running" : "Stopped"}`,
+      ts: new Date().toISOString(),
+    }));
+  } else {
+    ws.send(JSON.stringify({
+      type: "error",
+      msg: "PumpSwap module not loaded — @solana/web3.js may be missing",
+      ts: new Date().toISOString(),
+    }));
   }
-
-  const status = pumpswap.getStatus();
-  ws.send(JSON.stringify({
-    type: "info",
-    msg: `Connected to PumpSwap sniper. Status: ${status.running ? "Running" : "Stopped"}`,
-    ts: new Date().toISOString(),
-  }));
 });
 
 // Ping every 25s to keep connections alive through Railway's proxy
@@ -835,7 +859,7 @@ wss.on("close", () => clearInterval(heartbeat));
 function shutdown() {
   console.log("\nShutting down...");
   stopSniper();
-  pumpswap.stopSniper();
+  if (pumpswap) pumpswap.stopSniper();
   server.close();
   process.exit(0);
 }
