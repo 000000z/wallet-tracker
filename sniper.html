@@ -332,7 +332,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
                 <input type="password" id="cfgPrivateKey" placeholder="0x...">
                 <button class="pw-toggle" onclick="togglePw()">show</button>
             </div>
-            <div class="hint">Stored in browser localStorage only</div>
+            <div class="hint">Set via Railway env vars (optional override here)</div>
         </div>
         <div class="form-row">
             <label>RPC URL</label>
@@ -411,75 +411,11 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
     <div class="alert-log" id="eventLog"></div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
 <script src="shared.js"></script>
 <script>
-// ─── Constants (from sniper.js) ─────────────────────────────────────────────
-const ADDRESSES = {
-    feeLocker:       '0xF3622742b1E446D92e45E22923Ef11C2fcD55D68',
-    clankerFactory:  '0xE85A59c628F7d27878ACeB4bf3b35733630083a9',
-    universalRouter: '0x6ff5693b99212da76ad316178a184ab56d299b43',
-    poolManager:     '0x498581ff718922c3f8e6a244956af099b2652b2b',
-    v4Quoter:        '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
-};
-
-const KNOWN_HOOKS = [
-    { addr: '0xd60D6B218116cFd801E28F78d011a203D2b068Cc', fee: '0x800000', label: 'Dynamic v4.1' },
-    { addr: '0x34a45c6B61876d739400Bd71228CbcbD4F53E8cC', fee: '0x800000', label: 'Dynamic v4.0' },
-    { addr: '0xb429d62f8f3bFFb98CdB9569533eA23bF0Ba28CC', fee: '10000',   label: 'Static v4.1' },
-    { addr: '0xDd5EeaFff7BD481AD55Db083062b13a3cdf0A68CC', fee: '10000',   label: 'Static v4.0' },
-];
-
-const WETH_BASE = '0x4200000000000000000000000000000000000006';
-
-const TICK_SPACING = 200;
-const GAS_LIMIT = 500000n;
-const V4_SWAP_CMD = 0x10;
-const SWAP_EXACT_IN_SINGLE = 0x06;
-const SETTLE_ALL = 0x0c;
-const TAKE_ALL = 0x0f;
-
-// ─── ABIs ───────────────────────────────────────────────────────────────────
-const FEE_LOCKER_ABI = [
-    'event ClaimTokens(address indexed feeOwner, address indexed token, uint256 amountClaimed)',
-];
-
-const CLANKER_FACTORY_ABI = [
-    'event TokenCreated(address indexed tokenAddress, address indexed creator, address hooks, uint24 fee, int24 tickSpacing)',
-];
-
-const UNIVERSAL_ROUTER_ABI = [
-    'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable',
-];
-
-const V4_QUOTER_ABI = [
-    `function quoteExactInputSingle((
-        address currency0,
-        address currency1,
-        uint24 fee,
-        int24 tickSpacing,
-        address hooks,
-        uint128 amountIn,
-        uint160 sqrtPriceLimitX96,
-        bytes hookData
-    )) external returns (uint256 amountOut, uint256 gasEstimate)`,
-];
-
-// ─── State ──────────────────────────────────────────────────────────────────
-let running = false;
-let pollTimer = null;
-let lastBlock = 0;
-let claimsDetected = 0;
-let buysExecuted = 0;
-const boughtTokens = new Map();
-const poolKeyCache = new Map();
-let buyHistory = [];
-
-let provider = null;
-let wallet = null;
-let feeLocker = null;
-let factory = null;
-let quoter = null;
+// ─── Server-Backed Sniper Dashboard ─────────────────────────────────────────
+// All sniper logic runs on the server. This UI connects via WebSocket for
+// live log streaming and REST API for control/config/status.
 
 // ─── DOM refs ───────────────────────────────────────────────────────────────
 const $status = document.getElementById('statusSniper');
@@ -494,71 +430,160 @@ const $boughtBody = document.getElementById('boughtBody');
 const $btnStart = document.getElementById('btnStart');
 const $btnStop = document.getElementById('btnStop');
 
-// ─── Config ─────────────────────────────────────────────────────────────────
-const CONFIG_DEFAULTS = {
-    privateKey: '',
-    rpcUrl: 'https://mainnet.base.org',
-    buyAmountEth: '0.005',
-    slippagePct: 10,
-    minClaimAmountWei: '1000000000000000',
-    pollIntervalMs: 3000,
-    maxBuysPerToken: 1,
-    dryRun: true,
-    watchedTokens: '',
-    blacklistedTokens: '',
-};
+// ─── API Helpers ────────────────────────────────────────────────────────────
+const API_BASE = location.origin;
 
-function getConfig() {
-    const c = {};
-    for (const [key, def] of Object.entries(CONFIG_DEFAULTS)) {
-        const stored = localStorage.getItem('sniper_' + key);
-        if (stored !== null) {
-            if (typeof def === 'number') c[key] = Number(stored);
-            else if (typeof def === 'boolean') c[key] = stored === 'true';
-            else c[key] = stored;
-        } else {
-            c[key] = def;
+async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(API_BASE + path, opts);
+    return res.json();
+}
+
+// ─── WebSocket Connection ───────────────────────────────────────────────────
+let ws = null;
+let wsRetryTimer = null;
+
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(proto + '//' + location.host + '/ws');
+
+    ws.onopen = () => {
+        logEvent('info', 'WebSocket connected to server');
+        if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null; }
+    };
+
+    ws.onmessage = (ev) => {
+        try {
+            const data = JSON.parse(ev.data);
+            logEvent(data.type || 'info', data.msg || '');
+        } catch {
+            logEvent('info', ev.data);
         }
-    }
-    return c;
+    };
+
+    ws.onclose = () => {
+        logEvent('error', 'WebSocket disconnected — reconnecting in 3s...');
+        wsRetryTimer = setTimeout(connectWS, 3000);
+    };
+
+    ws.onerror = () => {
+        ws.close();
+    };
 }
 
-function loadConfigToForm() {
-    const c = getConfig();
-    document.getElementById('cfgPrivateKey').value = c.privateKey;
-    document.getElementById('cfgRpcUrl').value = c.rpcUrl;
-    document.getElementById('cfgBuyAmount').value = c.buyAmountEth;
-    document.getElementById('cfgSlippage').value = c.slippagePct;
-    document.getElementById('cfgMinClaim').value = c.minClaimAmountWei;
-    document.getElementById('cfgPollInterval').value = c.pollIntervalMs;
-    document.getElementById('cfgMaxBuys').value = c.maxBuysPerToken;
-    // Dry run toggle
-    const toggle = document.getElementById('cfgDryRun');
-    const label = document.getElementById('dryRunLabel');
-    if (c.dryRun) {
-        toggle.classList.add('on');
-        label.textContent = 'ON \u2014 no real transactions';
-    } else {
-        toggle.classList.remove('on');
-        label.textContent = 'OFF \u2014 LIVE trading';
+// ─── Event Log ──────────────────────────────────────────────────────────────
+const MAX_LOG_ENTRIES = 500;
+
+function logEvent(type, msg) {
+    const now = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.innerHTML = '<span class="log-time">' + now + '</span><span class="log-msg">' + escapeHtml(msg) + '</span>';
+    $log.insertBefore(entry, $log.firstChild);
+    while ($log.children.length > MAX_LOG_ENTRIES) {
+        $log.removeChild($log.lastChild);
     }
-    document.getElementById('cfgWatchedTokens').value = c.watchedTokens;
-    document.getElementById('cfgBlacklistedTokens').value = c.blacklistedTokens;
 }
 
-function saveConfig() {
-    localStorage.setItem('sniper_privateKey', document.getElementById('cfgPrivateKey').value.trim());
-    localStorage.setItem('sniper_rpcUrl', document.getElementById('cfgRpcUrl').value.trim());
-    localStorage.setItem('sniper_buyAmountEth', document.getElementById('cfgBuyAmount').value);
-    localStorage.setItem('sniper_slippagePct', document.getElementById('cfgSlippage').value);
-    localStorage.setItem('sniper_minClaimAmountWei', document.getElementById('cfgMinClaim').value.trim());
-    localStorage.setItem('sniper_pollIntervalMs', document.getElementById('cfgPollInterval').value);
-    localStorage.setItem('sniper_maxBuysPerToken', document.getElementById('cfgMaxBuys').value);
-    const isDry = document.getElementById('cfgDryRun').classList.contains('on');
-    localStorage.setItem('sniper_dryRun', isDry.toString());
-    localStorage.setItem('sniper_watchedTokens', document.getElementById('cfgWatchedTokens').value.trim());
-    localStorage.setItem('sniper_blacklistedTokens', document.getElementById('cfgBlacklistedTokens').value.trim());
-    logEvent('info', 'Config saved');
+function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function clearLog() {
+    $log.innerHTML = '';
+    logEvent('info', 'Log cleared');
+}
+
+// ─── Buy History ────────────────────────────────────────────────────────────
+let buyHistory = [];
+
+function renderBuyHistory() {
+    if (buyHistory.length === 0) {
+        $boughtSection.classList.remove('visible');
+        return;
+    }
+    $boughtSection.classList.add('visible');
+    $boughtBody.innerHTML = buyHistory.map(b => {
+        const shortToken = b.token.slice(0, 6) + '...' + b.token.slice(-4);
+        const txCell = b.dryRun
+            ? '<span class="badge-dry">dry run</span>'
+            : '<a href="https://basescan.org/tx/' + b.txHash + '" target="_blank">' + b.txHash.slice(0, 10) + '...</a>';
+        return '<tr>' +
+            '<td><a href="https://basescan.org/token/' + b.token + '" target="_blank">' + shortToken + '</a></td>' +
+            '<td>' + b.buyCount + '</td>' +
+            '<td>' + b.amountIn + ' ETH</td>' +
+            '<td>' + b.amountOut + '</td>' +
+            '<td>' + txCell + '</td>' +
+            '<td>' + new Date(b.time).toLocaleTimeString() + '</td>' +
+        '</tr>';
+    }).join('');
+}
+
+async function loadBuyHistory() {
+    try {
+        buyHistory = await api('GET', '/api/sniper/history');
+        renderBuyHistory();
+    } catch (err) {
+        logEvent('error', 'Failed to load buy history: ' + err.message);
+    }
+}
+
+// ─── Config (load from server, save to server) ─────────────────────────────
+async function loadConfigToForm() {
+    try {
+        const c = await api('GET', '/api/sniper/config');
+        document.getElementById('cfgPrivateKey').value = '';
+        document.getElementById('cfgPrivateKey').placeholder = c.privateKey || '(set via env var)';
+        document.getElementById('cfgRpcUrl').value = c.rpcUrl || '';
+        document.getElementById('cfgBuyAmount').value = c.buyAmountEth || '';
+        document.getElementById('cfgSlippage').value = c.slippagePct || '';
+        document.getElementById('cfgMinClaim').value = c.minClaimAmountWei || '';
+        document.getElementById('cfgPollInterval').value = c.pollIntervalMs || '';
+        document.getElementById('cfgMaxBuys').value = c.maxBuysPerToken || '';
+        // Dry run toggle
+        const toggle = document.getElementById('cfgDryRun');
+        const label = document.getElementById('dryRunLabel');
+        if (c.dryRun) {
+            toggle.classList.add('on');
+            label.textContent = 'ON \u2014 no real transactions';
+        } else {
+            toggle.classList.remove('on');
+            label.textContent = 'OFF \u2014 LIVE trading';
+        }
+        document.getElementById('cfgWatchedTokens').value = (c.watchedTokens || []).join('\n');
+        document.getElementById('cfgBlacklistedTokens').value = (c.blacklistedTokens || []).join('\n');
+    } catch (err) {
+        logEvent('error', 'Failed to load config from server: ' + err.message);
+    }
+}
+
+async function saveConfig() {
+    const body = {
+        rpcUrl: document.getElementById('cfgRpcUrl').value.trim(),
+        buyAmountEth: document.getElementById('cfgBuyAmount').value,
+        slippagePct: document.getElementById('cfgSlippage').value,
+        minClaimAmountWei: document.getElementById('cfgMinClaim').value.trim(),
+        pollIntervalMs: document.getElementById('cfgPollInterval').value,
+        maxBuysPerToken: document.getElementById('cfgMaxBuys').value,
+        dryRun: document.getElementById('cfgDryRun').classList.contains('on'),
+        watchedTokens: document.getElementById('cfgWatchedTokens').value.trim(),
+        blacklistedTokens: document.getElementById('cfgBlacklistedTokens').value.trim(),
+    };
+    // Only send private key if the user actually typed one
+    const pk = document.getElementById('cfgPrivateKey').value.trim();
+    if (pk) body.privateKey = pk;
+
+    try {
+        const result = await api('POST', '/api/sniper/config', body);
+        if (result.ok) {
+            logEvent('info', 'Config saved to server');
+        } else {
+            logEvent('error', 'Config save failed: ' + (result.error || 'unknown'));
+        }
+    } catch (err) {
+        logEvent('error', 'Config save failed: ' + err.message);
+    }
 }
 
 function toggleDryRun() {
@@ -584,506 +609,89 @@ function togglePw() {
     }
 }
 
-// ─── Buy History Persistence ────────────────────────────────────────────────
-function loadBuyHistory() {
-    try {
-        buyHistory = JSON.parse(localStorage.getItem('sniper_buyHistory') || '[]');
-    } catch { buyHistory = []; }
-    renderBuyHistory();
-}
-
-function saveBuyHistory() {
-    localStorage.setItem('sniper_buyHistory', JSON.stringify(buyHistory));
-}
-
-function renderBuyHistory() {
-    if (buyHistory.length === 0) {
-        $boughtSection.classList.remove('visible');
-        return;
-    }
-    $boughtSection.classList.add('visible');
-    $boughtBody.innerHTML = buyHistory.map(b => {
-        const shortToken = b.token.slice(0, 6) + '...' + b.token.slice(-4);
-        const txCell = b.dryRun
-            ? '<span class="badge-dry">dry run</span>'
-            : '<a href="https://basescan.org/tx/' + b.txHash + '" target="_blank">' + b.txHash.slice(0, 10) + '...</a>';
-        return '<tr>' +
-            '<td><a href="https://basescan.org/token/' + b.token + '" target="_blank">' + shortToken + '</a></td>' +
-            '<td>' + b.buyCount + '</td>' +
-            '<td>' + b.amountIn + ' ETH</td>' +
-            '<td>' + b.amountOut + '</td>' +
-            '<td>' + txCell + '</td>' +
-            '<td>' + new Date(b.time).toLocaleTimeString() + '</td>' +
-        '</tr>';
-    }).join('');
-}
-
-// ─── Event Log ──────────────────────────────────────────────────────────────
-const MAX_LOG_ENTRIES = 500;
-
-function logEvent(type, msg) {
-    const now = new Date().toLocaleTimeString();
-    const entry = document.createElement('div');
-    entry.className = 'log-entry ' + type;
-    entry.innerHTML = '<span class="log-time">' + now + '</span><span class="log-msg">' + escapeHtml(msg) + '</span>';
-    // Newest first
-    $log.insertBefore(entry, $log.firstChild);
-    // Cap entries
-    while ($log.children.length > MAX_LOG_ENTRIES) {
-        $log.removeChild($log.lastChild);
-    }
-}
-
-function escapeHtml(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function clearLog() {
-    $log.innerHTML = '';
-    logEvent('info', 'Log cleared');
-}
-
-// ─── Pool Resolution (ported from sniper.js) ────────────────────────────────
-async function resolvePoolKey(tokenAddress, amountIn) {
-    const tokenLower = tokenAddress.toLowerCase();
-    if (poolKeyCache.has(tokenLower)) return poolKeyCache.get(tokenLower);
-
-    // Strategy 1: Factory event lookup
-    try {
-        const filter = factory.filters.TokenCreated(tokenAddress);
-        const events = await factory.queryFilter(filter, 0, 'latest');
-        if (events.length > 0) {
-            const ev = events[0];
-            const poolKey = {
-                hooks: ev.args.hooks,
-                fee: ev.args.fee.toString(),
-                tickSpacing: Number(ev.args.tickSpacing),
-            };
-            logEvent('info', '  Pool resolved via factory event: hook=' + poolKey.hooks + ', fee=' + poolKey.fee);
-            poolKeyCache.set(tokenLower, poolKey);
-            return poolKey;
-        }
-    } catch (err) {
-        logEvent('error', '  Factory event lookup failed: ' + err.message);
-    }
-
-    // Strategy 2: Known hook probing
-    logEvent('info', '  Trying known hooks via quoter...');
-    for (const hook of KNOWN_HOOKS) {
-        try {
-            const params = {
-                currency0: ethers.ZeroAddress,
-                currency1: tokenAddress,
-                fee: hook.fee,
-                tickSpacing: TICK_SPACING,
-                hooks: hook.addr,
-                amountIn: amountIn,
-                sqrtPriceLimitX96: 0n,
-                hookData: '0x',
-            };
-            const result = await quoter.quoteExactInputSingle.staticCall(params);
-            if (result.amountOut > 0n) {
-                const poolKey = {
-                    hooks: hook.addr,
-                    fee: hook.fee,
-                    tickSpacing: TICK_SPACING,
-                };
-                logEvent('info', '  Pool resolved via quoter: ' + hook.label);
-                poolKeyCache.set(tokenLower, poolKey);
-                return poolKey;
-            }
-        } catch {
-            // try next hook
-        }
-    }
-
-    return null;
-}
-
-// ─── Swap Encoding (ported from sniper.js) ──────────────────────────────────
-function encodeV4Swap(tokenAddress, poolKey, amountIn, amountOutMin) {
-    const actions = ethers.solidityPacked(
-        ['uint8', 'uint8', 'uint8'],
-        [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL]
-    );
-
-    const currency0 = ethers.ZeroAddress;
-    const currency1 = tokenAddress;
-
-    const swapParams = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['tuple(tuple(address,address,uint24,int24,address) poolKey, bool zeroForOne, uint128 amountIn, uint128 amountOutMinimum, uint160 sqrtPriceLimitX96, bytes hookData)'],
-        [{
-            poolKey: {
-                0: currency0,
-                1: currency1,
-                2: poolKey.fee,
-                3: poolKey.tickSpacing,
-                4: poolKey.hooks,
-            },
-            zeroForOne: true,
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMin,
-            sqrtPriceLimitX96: 0n,
-            hookData: '0x',
-        }]
-    );
-
-    const settleParams = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address', 'uint256'],
-        [currency0, amountIn]
-    );
-
-    const takeParams = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address', 'uint256'],
-        [currency1, amountOutMin]
-    );
-
-    const v4Input = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['bytes', 'bytes[]'],
-        [actions, [swapParams, settleParams, takeParams]]
-    );
-
-    const commands = ethers.solidityPacked(['uint8'], [V4_SWAP_CMD]);
-    return { commands, inputs: [v4Input] };
-}
-
-// ─── Execute Buy (ported from sniper.js) ────────────────────────────────────
-async function executeBuy(tokenAddress, poolKey) {
-    const config = getConfig();
-    const amountIn = ethers.parseEther(config.buyAmountEth);
-
-    // Get quote
-    let amountOut;
-    try {
-        const quoteParams = {
-            currency0: ethers.ZeroAddress,
-            currency1: tokenAddress,
-            fee: poolKey.fee,
-            tickSpacing: poolKey.tickSpacing,
-            hooks: poolKey.hooks,
-            amountIn: amountIn,
-            sqrtPriceLimitX96: 0n,
-            hookData: '0x',
-        };
-        const result = await quoter.quoteExactInputSingle.staticCall(quoteParams);
-        amountOut = result[0];
-        logEvent('info', '  Quote: ' + ethers.formatEther(amountIn) + ' ETH -> ' + amountOut.toString() + ' tokens');
-    } catch (err) {
-        logEvent('error', '  Quote failed: ' + err.message);
-        return null;
-    }
-
-    // Apply slippage
-    const slippageBps = BigInt(config.slippagePct * 100);
-    const amountOutMin = amountOut * (10000n - slippageBps) / 10000n;
-    logEvent('info', '  Min output (' + config.slippagePct + '% slippage): ' + amountOutMin.toString() + ' tokens');
-
-    const buyCount = (boughtTokens.get(tokenAddress.toLowerCase()) || 0) + 1;
-
-    if (config.dryRun) {
-        logEvent('buy', 'DRY RUN: Would buy ' + tokenAddress.slice(0, 10) + '... with ' + config.buyAmountEth + ' ETH, expected ~' + amountOut.toString() + ' tokens');
-        const entry = {
-            token: tokenAddress,
-            buyCount: buyCount,
-            amountIn: config.buyAmountEth,
-            amountOut: amountOut.toString(),
-            txHash: '',
-            dryRun: true,
-            time: Date.now(),
-        };
-        buyHistory.unshift(entry);
-        saveBuyHistory();
-        renderBuyHistory();
-        return { dryRun: true, amountOut: amountOut.toString() };
-    }
-
-    // Encode and send
-    const { commands, inputs } = encodeV4Swap(tokenAddress, poolKey, amountIn, amountOutMin);
-    const deadline = Math.floor(Date.now() / 1000) + 120;
-    const router = new ethers.Contract(ADDRESSES.universalRouter, UNIVERSAL_ROUTER_ABI, wallet);
-
-    try {
-        const tx = await router.execute(commands, inputs, deadline, {
-            value: amountIn,
-            gasLimit: GAS_LIMIT,
-        });
-        logEvent('buy', 'TX sent: ' + tx.hash);
-        logEvent('info', '  Waiting for confirmation...');
-
-        const receipt = await tx.wait();
-        logEvent('buy', 'TX confirmed in block ' + receipt.blockNumber + ', gas used: ' + receipt.gasUsed.toString());
-        logEvent('buy', 'BaseScan: https://basescan.org/tx/' + tx.hash);
-
-        const entry = {
-            token: tokenAddress,
-            buyCount: buyCount,
-            amountIn: config.buyAmountEth,
-            amountOut: amountOut.toString(),
-            txHash: tx.hash,
-            dryRun: false,
-            time: Date.now(),
-        };
-        buyHistory.unshift(entry);
-        saveBuyHistory();
-        renderBuyHistory();
-
-        return { txHash: tx.hash, blockNumber: receipt.blockNumber, amountOut: amountOut.toString() };
-    } catch (err) {
-        logEvent('error', 'TX failed: ' + err.message);
-        return null;
-    }
-}
-
-// ─── Resolve actual token from the same TX receipt ──────────────────────────
-const claimTokenTopic = ethers.id('ClaimTokens(address,address,uint256)');
-
-async function resolveTokenFromTx(txHash) {
-    try {
-        const receipt = await provider.getTransactionReceipt(txHash);
-        if (!receipt) return null;
-
-        // Parse all ClaimTokens logs in this TX
-        const iface = new ethers.Interface(FEE_LOCKER_ABI);
-        for (const log of receipt.logs) {
-            if (log.address.toLowerCase() !== ADDRESSES.feeLocker.toLowerCase()) continue;
-            if (log.topics[0] !== claimTokenTopic) continue;
-            try {
-                const parsed = iface.parseLog({ topics: log.topics, data: log.data });
-                const token = parsed.args.token;
-                // Return the first non-WETH token in this TX
-                if (token.toLowerCase() !== WETH_BASE.toLowerCase()) {
-                    return token;
-                }
-            } catch { /* skip unparseable logs */ }
-        }
-    } catch (err) {
-        logEvent('error', '  TX receipt lookup failed: ' + err.message);
-    }
-    return null;
-}
-
-// ─── Process Claim (ported from sniper.js) ──────────────────────────────────
-async function processClaim(event) {
-    const { feeOwner, token, amountClaimed } = event.args;
-    const config = getConfig();
-
-    claimsDetected++;
-    $claims.textContent = claimsDetected;
-
-    // Determine the actual token to buy
-    let buyToken = token;
-    const isWethClaim = token.toLowerCase() === WETH_BASE.toLowerCase();
-
-    if (isWethClaim) {
-        logEvent('claim', 'WETH FEE CLAIM from ' + feeOwner.slice(0, 10) + '... (' + ethers.formatEther(amountClaimed) + ' ETH)');
-        logEvent('info', '  Checking TX for actual token...');
-        const actualToken = await resolveTokenFromTx(event.transactionHash);
-        if (!actualToken) {
-            logEvent('skip', '  SKIP: No token found in TX ' + event.transactionHash.slice(0, 14) + '...');
-            return;
-        }
-        buyToken = actualToken;
-        logEvent('claim', '  Resolved token: ' + buyToken);
-    } else {
-        logEvent('claim', 'CLAIM DETECTED:');
-        logEvent('claim', '  Fee Owner: ' + feeOwner);
-        logEvent('claim', '  Token: ' + token);
-    }
-
-    logEvent('claim', '  Claim Amount: ' + amountClaimed.toString() + ' wei (' + ethers.formatEther(amountClaimed) + ' ETH)');
-
-    // Filter: min claim
-    if (amountClaimed < BigInt(config.minClaimAmountWei)) {
-        logEvent('skip', '  SKIP: Claim below minimum (' + config.minClaimAmountWei + ' wei)');
-        return;
-    }
-
-    // Filter: watched tokens
-    const watchedList = config.watchedTokens.split('\n').map(s => s.trim()).filter(Boolean);
-    if (watchedList.length > 0) {
-        const isWatched = watchedList.some(w => w.toLowerCase() === buyToken.toLowerCase());
-        if (!isWatched) {
-            logEvent('skip', '  SKIP: Token ' + buyToken.slice(0, 10) + '... not in watched list');
-            return;
-        }
-    }
-
-    // Filter: blacklist
-    const blacklist = config.blacklistedTokens.split('\n').map(s => s.trim()).filter(Boolean);
-    if (blacklist.length > 0) {
-        const isBlacklisted = blacklist.some(b => b.toLowerCase() === buyToken.toLowerCase());
-        if (isBlacklisted) {
-            logEvent('skip', '  SKIP: Token ' + buyToken.slice(0, 10) + '... is blacklisted');
-            return;
-        }
-    }
-
-    // Filter: max buys
-    const buyCount = boughtTokens.get(buyToken.toLowerCase()) || 0;
-    if (buyCount >= config.maxBuysPerToken) {
-        logEvent('skip', '  SKIP: Already bought ' + buyToken.slice(0, 10) + '... ' + buyCount + 'x (max: ' + config.maxBuysPerToken + ')');
-        return;
-    }
-
-    // Resolve pool
-    const amountIn = ethers.parseEther(config.buyAmountEth);
-    const poolKey = await resolvePoolKey(buyToken, amountIn);
-    if (!poolKey) {
-        logEvent('error', '  SKIP: Could not resolve pool for ' + buyToken);
-        return;
-    }
-
-    // Execute buy
-    logEvent('info', '  BUYING ' + buyToken.slice(0, 10) + '... with ' + config.buyAmountEth + ' ETH...');
-    const result = await executeBuy(buyToken, poolKey);
-
-    if (result) {
-        boughtTokens.set(buyToken.toLowerCase(), buyCount + 1);
-        buysExecuted++;
-        $buys.textContent = buysExecuted;
-        logEvent('buy', 'BUY COMPLETE for ' + buyToken.slice(0, 10) + '...');
-    }
-}
-
-// ─── Poll Loop ──────────────────────────────────────────────────────────────
-async function pollOnce() {
-    if (!running) return;
-
-    try {
-        const currentBlock = await provider.getBlockNumber();
-        $block.textContent = currentBlock.toLocaleString();
-
-        if (currentBlock > lastBlock) {
-            const filter = feeLocker.filters.ClaimTokens();
-            const events = await feeLocker.queryFilter(filter, lastBlock + 1, currentBlock);
-
-            if (events.length > 0) {
-                logEvent('info', 'Found ' + events.length + ' claim(s) in blocks ' + (lastBlock + 1) + '-' + currentBlock);
-            }
-
-            for (const event of events) {
-                try {
-                    await processClaim(event);
-                } catch (err) {
-                    logEvent('error', 'Error processing claim: ' + err.message);
-                }
-            }
-
-            lastBlock = currentBlock;
-        }
-    } catch (err) {
-        logEvent('error', 'Poll error: ' + err.message);
-    }
-
-    if (running) {
-        const config = getConfig();
-        pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
-    }
-}
-
-// ─── Start / Stop ───────────────────────────────────────────────────────────
+// ─── Start / Stop (server-side) ─────────────────────────────────────────────
 async function startSniper() {
-    const config = getConfig();
-
-    if (!config.privateKey || config.privateKey === 'YOUR_BASE_WALLET_PRIVATE_KEY') {
-        logEvent('error', 'Set your private key in config before starting');
-        return;
-    }
-
-    saveConfig();
-
-    $status.textContent = 'Connecting';
+    $status.textContent = 'Starting...';
     $status.className = 'value connecting';
     $btnStart.disabled = true;
-    logEvent('info', 'Connecting to ' + config.rpcUrl + '...');
+    logEvent('info', 'Sending start command to server...');
 
     try {
-        provider = new ethers.JsonRpcProvider(config.rpcUrl);
-        wallet = new ethers.Wallet(config.privateKey, provider);
-
-        // Display wallet
-        const addr = wallet.address;
-        $wallet.textContent = addr.slice(0, 6) + '...' + addr.slice(-4);
-        $wallet.title = addr;
-
-        // Get balance
-        const balance = await provider.getBalance(addr);
-        $balance.textContent = parseFloat(ethers.formatEther(balance)).toFixed(4) + ' ETH';
-        if (balance === 0n) {
-            logEvent('error', 'WARNING: Wallet has 0 ETH — swaps will fail');
+        const result = await api('POST', '/api/sniper/start');
+        if (result.ok) {
+            $status.textContent = 'Running';
+            $status.className = 'value running';
+            $btnStop.disabled = false;
+        } else {
+            logEvent('error', 'Start failed: ' + (result.error || 'unknown'));
+            $status.textContent = 'Stopped';
+            $status.className = 'value stopped';
+            $btnStart.disabled = false;
         }
-
-        // Init contracts
-        feeLocker = new ethers.Contract(ADDRESSES.feeLocker, FEE_LOCKER_ABI, provider);
-        factory = new ethers.Contract(ADDRESSES.clankerFactory, CLANKER_FACTORY_ABI, provider);
-        quoter = new ethers.Contract(ADDRESSES.v4Quoter, V4_QUOTER_ABI, provider);
-
-        // Start from current block
-        lastBlock = await provider.getBlockNumber();
-        $block.textContent = lastBlock.toLocaleString();
-
-        running = true;
-        $status.textContent = 'Running';
-        $status.className = 'value running';
-        $btnStart.disabled = true;
-        $btnStop.disabled = false;
-
-        logEvent('info', '═══ Clanker Claim Sniper Started ═══');
-        logEvent('info', 'Wallet: ' + addr);
-        logEvent('info', 'Balance: ' + ethers.formatEther(balance) + ' ETH');
-        logEvent('info', 'Buy Amount: ' + config.buyAmountEth + ' ETH | Slippage: ' + config.slippagePct + '%');
-        logEvent('info', 'Dry Run: ' + (config.dryRun ? 'ON' : 'OFF') + ' | Poll: ' + config.pollIntervalMs + 'ms');
-        logEvent('info', 'Starting from block ' + lastBlock);
-        logEvent('info', 'Listening for ClaimTokens events...');
-
-        // Reset session counters
-        claimsDetected = 0;
-        buysExecuted = 0;
-        $claims.textContent = '0';
-        $buys.textContent = '0';
-
-        // Begin polling
-        pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
-
     } catch (err) {
-        logEvent('error', 'Failed to connect: ' + err.message);
+        logEvent('error', 'Start failed: ' + err.message);
         $status.textContent = 'Stopped';
         $status.className = 'value stopped';
         $btnStart.disabled = false;
-        running = false;
     }
 }
 
-function stopSniper() {
-    running = false;
-    if (pollTimer) {
-        clearTimeout(pollTimer);
-        pollTimer = null;
+async function stopSniper() {
+    logEvent('info', 'Sending stop command to server...');
+    try {
+        await api('POST', '/api/sniper/stop');
+        $status.textContent = 'Stopped';
+        $status.className = 'value stopped';
+        $btnStart.disabled = false;
+        $btnStop.disabled = true;
+    } catch (err) {
+        logEvent('error', 'Stop failed: ' + err.message);
     }
-    $status.textContent = 'Stopped';
-    $status.className = 'value stopped';
-    $btnStart.disabled = false;
-    $btnStop.disabled = true;
-    logEvent('info', 'Sniper stopped');
+}
+
+// ─── Status Polling ─────────────────────────────────────────────────────────
+async function pollStatus() {
+    try {
+        const s = await api('GET', '/api/sniper/status');
+        // Update status indicator
+        if (s.running) {
+            $status.textContent = 'Running';
+            $status.className = 'value running';
+            $btnStart.disabled = true;
+            $btnStop.disabled = false;
+        } else {
+            $status.textContent = 'Stopped';
+            $status.className = 'value stopped';
+            $btnStart.disabled = false;
+            $btnStop.disabled = true;
+        }
+        // Update stats
+        if (s.wallet) {
+            $wallet.textContent = s.wallet.slice(0, 6) + '...' + s.wallet.slice(-4);
+            $wallet.title = s.wallet;
+        }
+        if (s.balance) $balance.textContent = parseFloat(s.balance).toFixed(4) + ' ETH';
+        if (s.block) $block.textContent = s.block.toLocaleString();
+        $claims.textContent = s.claimsDetected || 0;
+        $buys.textContent = s.buysExecuted || 0;
+    } catch {
+        // Server unreachable — will retry
+    }
 }
 
 async function refreshBalance() {
-    if (!provider || !wallet) {
-        logEvent('error', 'Not connected — start sniper first');
-        return;
-    }
-    try {
-        const balance = await provider.getBalance(wallet.address);
-        $balance.textContent = parseFloat(ethers.formatEther(balance)).toFixed(4) + ' ETH';
-        logEvent('info', 'Balance refreshed: ' + ethers.formatEther(balance) + ' ETH');
-    } catch (err) {
-        logEvent('error', 'Balance refresh failed: ' + err.message);
-    }
+    logEvent('info', 'Refreshing status...');
+    await pollStatus();
+    await loadBuyHistory();
+    logEvent('info', 'Status refreshed');
 }
 
 // ─── Init ───────────────────────────────────────────────────────────────────
+connectWS();
 loadConfigToForm();
 loadBuyHistory();
+pollStatus();
+setInterval(pollStatus, 3000);
 </script>
 </body>
 </html>

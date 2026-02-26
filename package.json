@@ -1,0 +1,14 @@
+{
+  "name": "chillz-wallet-tracker",
+  "version": "1.0.0",
+  "description": "Solana wallet tracker + Clanker claim sniper on Base",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0",
+    "ethers": "^6.13.0"
+  }
+}
