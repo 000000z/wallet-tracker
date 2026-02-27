@@ -556,11 +556,19 @@ async function setupEventListener() {
       }
     });
 
-    // Handle WebSocket disconnect — fall back to polling
+    // Handle WebSocket disconnect — try to reconnect, fall back to polling
     wsProvider.websocket.on("close", () => {
       if (!sniperRunning) return;
-      log("error", "RPC WebSocket disconnected — falling back to polling");
-      startPolling();
+      log("error", "RPC WebSocket disconnected — reconnecting in 5s...");
+      teardownEventListener();
+      setTimeout(async () => {
+        if (!sniperRunning) return;
+        const ok = await setupEventListener();
+        if (!ok) {
+          log("error", "WS reconnect failed — falling back to polling");
+          startPolling();
+        }
+      }, 5000);
     });
 
     wsProvider.websocket.on("error", (err) => {
@@ -871,9 +879,19 @@ const PORT = process.env.PORT || 3000;
 
 loadState();
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Site:   http://localhost:${PORT}`);
   console.log(`Sniper: http://localhost:${PORT}/sniper.html`);
   console.log(`WS:     ws://localhost:${PORT}/ws`);
+
+  // Auto-start Clanker sniper if configured
+  if (process.env.AUTO_START === "true" && config.privateKey && config.privateKey !== "YOUR_BASE_WALLET_PRIVATE_KEY") {
+    try {
+      console.log("Auto-starting Clanker sniper...");
+      await startSniper();
+    } catch (err) {
+      console.error("Auto-start failed:", err.message);
+    }
+  }
 });
