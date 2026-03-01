@@ -484,6 +484,8 @@ async function processClaim(event) {
     buyToken = actualToken;
   }
 
+  const buyTokenLower = buyToken.toLowerCase();
+
   // Filter: watched tokens
   const isWatched = config.watchedTokens.some(w => w.toLowerCase() === buyTokenLower);
   if (!isWatched) return;
@@ -949,6 +951,14 @@ server.listen(PORT, async () => {
   console.log(`Site:   http://localhost:${PORT}`);
   console.log(`Sniper: http://localhost:${PORT}/sniper.html`);
   console.log(`WS:     ws://localhost:${PORT}/ws`);
+
+  // Test Discord webhook on startup
+  notify("info", "Server Started", `Sniper server is online on port ${PORT}`, {
+    fields: [
+      { name: "Clanker", value: config.watchedTokens.length > 0 ? `${config.watchedTokens.length} watched` : "Notify-only" },
+      { name: "PumpSwap", value: pumpswap ? "Loaded" : "Not loaded" },
+    ],
+  });
 
   // Auto-start Clanker sniper if configured
   if (process.env.AUTO_START === "true" && config.privateKey && config.privateKey !== "YOUR_BASE_WALLET_PRIVATE_KEY") {

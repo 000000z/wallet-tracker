@@ -1,7 +1,9 @@
 // ─── Discord Notification Module ──────────────────────────────────────────────
 // Sends formatted alerts to Discord via webhook. Anti-spam built in.
 
-const WEBHOOK_URL = process.env.DISCORD_WEBHOOK || "";
+const WEBHOOK_URL = (process.env.DISCORD_WEBHOOK || "").trim();
+
+console.log(`[notify] DISCORD_WEBHOOK ${WEBHOOK_URL ? "loaded (" + WEBHOOK_URL.length + " chars)" : "NOT SET — notifications disabled"}`);
 
 // Anti-spam: cooldown per key (e.g., "buy:tokenMint" or "claim:creator")
 const cooldowns = new Map();
@@ -30,12 +32,18 @@ const COLORS = {
  *   - thumbnail: image URL
  */
 async function notify(type, title, description, opts = {}) {
-  if (!WEBHOOK_URL) return;
+  if (!WEBHOOK_URL) {
+    console.log(`[notify] SKIP (no webhook): ${title}`);
+    return;
+  }
 
   // Anti-spam: skip if same key was sent recently
   if (opts.key) {
     const lastSent = cooldowns.get(opts.key);
-    if (lastSent && Date.now() - lastSent < COOLDOWN_MS) return;
+    if (lastSent && Date.now() - lastSent < COOLDOWN_MS) {
+      console.log(`[notify] SKIP (cooldown): ${title} [key=${opts.key}]`);
+      return;
+    }
     cooldowns.set(opts.key, Date.now());
   }
 
@@ -69,20 +77,26 @@ async function notify(type, title, description, opts = {}) {
       body: JSON.stringify({ embeds: [embed] }),
     });
 
-    // Rate limited by Discord — back off
-    if (resp.status === 429) {
+    if (resp.ok) {
+      console.log(`[notify] SENT: ${title}`);
+    } else if (resp.status === 429) {
+      // Rate limited by Discord — back off
       const data = await resp.json().catch(() => ({}));
       const retryMs = (data.retry_after || 1) * 1000;
+      console.log(`[notify] Rate limited, retrying in ${retryMs}ms...`);
       await new Promise(r => setTimeout(r, retryMs));
-      // Retry once
       await fetch(WEBHOOK_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ embeds: [embed] }),
       });
+      console.log(`[notify] SENT (retry): ${title}`);
+    } else {
+      const text = await resp.text().catch(() => "");
+      console.error(`[notify] Discord returned ${resp.status}: ${text}`);
     }
   } catch (err) {
-    console.error("Discord notify failed:", err.message);
+    console.error(`[notify] FAILED: ${err.message}`);
   }
 }
 
