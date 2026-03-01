@@ -466,8 +466,11 @@ async function processClaim(event) {
     // Resolve the actual token from TX (merges WETH + token fee events into one)
     const claimToken = !isWethClaim ? token : await resolveTokenFromTx(event.transactionHash).catch(() => null);
 
-    // Dedup: skip if we already notified for this token (or this TX if token unknown)
-    const dedupKey = claimToken ? claimToken.toLowerCase() : event.transactionHash.toLowerCase();
+    // Skip if we couldn't resolve the token — no useful info to show
+    if (!claimToken) return;
+
+    // Dedup: skip if we already notified for this token
+    const dedupKey = claimToken.toLowerCase();
     if (scannedTokens.has(dedupKey)) return;
     scannedTokens.add(dedupKey);
     saveState();
