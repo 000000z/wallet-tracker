@@ -25,6 +25,7 @@ let claimsDetected = 0;
 let buysExecuted = 0;
 let buyHistory = [];
 const boughtTokens = new Map();
+const scannedTokens = new Set();
 const logBuffer = [];
 
 // Broadcast function — set by init()
@@ -59,6 +60,7 @@ function loadState() {
     if (fs.existsSync(STATE_FILE)) {
       const data = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
       if (data.boughtTokens) for (const [k, v] of Object.entries(data.boughtTokens)) boughtTokens.set(k, v);
+      if (data.scannedTokens) for (const t of data.scannedTokens) scannedTokens.add(t);
       if (data.buyHistory) buyHistory = data.buyHistory;
       if (data.claimsDetected) claimsDetected = data.claimsDetected;
       if (data.buysExecuted) buysExecuted = data.buysExecuted;
@@ -72,6 +74,7 @@ function saveState() {
   try {
     fs.writeFileSync(STATE_FILE, JSON.stringify({
       boughtTokens: Object.fromEntries(boughtTokens),
+      scannedTokens: [...scannedTokens],
       buyHistory, claimsDetected, buysExecuted,
     }, null, 2));
   } catch (err) {
@@ -307,9 +310,13 @@ async function processClaim(coinCreator, feeAmount, signature) {
     return;
   }
 
+  // Filter already-scanned tokens
+  const unscannedTokens = tokens.filter(t => !scannedTokens.has(t));
+  if (unscannedTokens.length === 0) return; // all tokens already processed
+
   log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
-  log("info", `Creator matches watched token(s): ${tokens.join(", ")}`);
+  log("info", `Creator matches watched token(s): ${unscannedTokens.join(", ")}`);
 
   notify("claim", "PumpSwap Fee Claim Detected", `Creator **${creatorStr.slice(0,8)}...** claimed **${feeSol.toFixed(4)} SOL**`, {
     key: `pump-claim:${signature}`,
@@ -318,13 +325,15 @@ async function processClaim(coinCreator, feeAmount, signature) {
     fields: [
       { name: "Creator", value: `\`${creatorStr}\`` },
       { name: "Fee", value: `${feeSol.toFixed(4)} SOL` },
-      { name: "Token(s)", value: tokens.map(t => `\`${t.slice(0,8)}...\``).join(", ") },
+      { name: "Token(s)", value: unscannedTokens.map(t => `\`${t.slice(0,8)}...\``).join(", ") },
     ],
   });
 
-  for (const tokenMint of tokens) {
+  for (const tokenMint of unscannedTokens) {
+    scannedTokens.add(tokenMint);
     await executeBuy(new PublicKey(tokenMint));
   }
+  saveState();
 }
 
 // ─── Start / Stop ────────────────────────────────────────────────────────────
@@ -500,9 +509,15 @@ function updateConfig(body) {
 
 function getHistory() { return buyHistory; }
 function getLogBuffer() { return logBuffer; }
+function getScannedTokens() { return [...scannedTokens]; }
+function removeScanned(token) {
+  const deleted = scannedTokens.delete(token);
+  if (deleted) { saveState(); log("info", `Removed ${token} from scanned list`); }
+  return deleted;
+}
 
 module.exports = {
   init, startSniper, stopSniper,
   getStatus, getStatusWithBalance, getConfig, updateConfig,
-  getHistory, getLogBuffer,
+  getHistory, getLogBuffer, getScannedTokens, removeScanned,
 };

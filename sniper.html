@@ -387,6 +387,16 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code',
     <button class="btn btn-refresh" onclick="refreshBalance()">Refresh Balance</button>
 </div>
 
+<!-- Remove from scanned list -->
+<div class="section" style="padding:12px 20px;border-bottom:1px solid #1e1e2e;">
+    <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="removeScannedInput" placeholder="Paste contract to re-enable scanning..." style="flex:1;background:#1a1a2e;border:1px solid #2a2a3e;color:#e0e0e0;padding:8px 12px;border-radius:6px;font-family:inherit;font-size:13px;">
+        <button class="btn btn-clear" onclick="removeScanned()">Remove from scanned</button>
+        <span id="removeResult" style="font-size:11px;color:#666;"></span>
+    </div>
+    <div style="font-size:11px;color:#484f58;margin-top:4px;">Removes a token from the "already processed" list so it can be scanned again on next claim</div>
+</div>
+
 <!-- Bought Tokens -->
 <div class="section bought-section" id="boughtSection">
     <div class="section-title">Bought Tokens</div>
@@ -606,6 +616,28 @@ function togglePw() {
     } else {
         inp.type = 'password';
         btn.textContent = 'show';
+    }
+}
+
+// ─── Remove from scanned list ───────────────────────────────────────────────
+async function removeScanned() {
+    const input = document.getElementById('removeScannedInput');
+    const result = document.getElementById('removeResult');
+    const token = input.value.trim();
+    if (!token) { result.textContent = 'Paste a contract address'; result.style.color = '#f85149'; return; }
+    try {
+        const resp = await api('POST', '/api/sniper/scanned/remove', { token });
+        if (resp.deleted) {
+            result.textContent = 'Removed — will scan again on next claim';
+            result.style.color = '#3fb950';
+            input.value = '';
+        } else {
+            result.textContent = 'Not found in scanned list';
+            result.style.color = '#f59e0b';
+        }
+    } catch (err) {
+        result.textContent = 'Error: ' + err.message;
+        result.style.color = '#f85149';
     }
 }
 

@@ -147,6 +147,12 @@
   <button class="btn" onclick="refreshBalance()">Refresh Balance</button>
 </div>
 
+<div style="display:flex;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid #21262d;">
+  <input type="text" id="removeScannedInput" placeholder="Paste token mint to re-enable scanning..." style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px 10px;color:#e6edf3;font-family:inherit;font-size:0.85rem;">
+  <button class="btn" onclick="removeScanned()">Remove from scanned</button>
+  <span id="removeResult" style="font-size:0.7rem;color:#8b949e;"></span>
+</div>
+
 <div class="log-section">
   <h2>EVENT LOG</h2>
   <div id="eventLog"></div>
@@ -287,6 +293,34 @@ function updateDryRunLabel() {
         : 'OFF &mdash; LIVE trading';
 }
 document.getElementById('cfgDryRun').addEventListener('change', updateDryRunLabel);
+
+// ─── Remove from scanned list ────────────────────────────────────────────────
+async function removeScanned() {
+    const input = document.getElementById('removeScannedInput');
+    const result = document.getElementById('removeResult');
+    const token = input.value.trim();
+    if (!token) { result.textContent = 'Paste a token mint'; result.style.color = '#f85149'; return; }
+    try {
+        const res = await fetch('/api/pumpswap/scanned/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+        });
+        const d = await res.json();
+        if (d.deleted) {
+            result.textContent = 'Removed — will scan again on next claim';
+            result.style.color = '#3fb950';
+            input.value = '';
+            logEvent('info', 'Removed ' + token + ' from scanned list');
+        } else {
+            result.textContent = 'Not found in scanned list';
+            result.style.color = '#f59e0b';
+        }
+    } catch (err) {
+        result.textContent = 'Error: ' + err.message;
+        result.style.color = '#f85149';
+    }
+}
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 connectWS();

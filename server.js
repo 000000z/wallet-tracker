@@ -803,6 +803,18 @@ app.get("/api/sniper/history", (req, res) => {
   res.json(buyHistory);
 });
 
+app.get("/api/sniper/scanned", (req, res) => {
+  res.json([...scannedTokens]);
+});
+
+app.post("/api/sniper/scanned/remove", (req, res) => {
+  const token = (req.body.token || "").trim().toLowerCase();
+  if (!token) return res.json({ ok: false, error: "No token provided" });
+  const deleted = scannedTokens.delete(token);
+  if (deleted) { saveState(); log("info", `Removed ${token} from scanned list`); }
+  res.json({ ok: true, deleted });
+});
+
 // ─── PumpSwap API Routes ─────────────────────────────────────────────────────
 if (pumpswap) {
   pumpswap.init((entry) => {
@@ -846,6 +858,19 @@ app.post("/api/pumpswap/config", (req, res) => {
 app.get("/api/pumpswap/history", (req, res) => {
   if (!pumpswap) return res.json([]);
   res.json(pumpswap.getHistory());
+});
+
+app.get("/api/pumpswap/scanned", (req, res) => {
+  if (!pumpswap) return res.json([]);
+  res.json(pumpswap.getScannedTokens());
+});
+
+app.post("/api/pumpswap/scanned/remove", (req, res) => {
+  if (!pumpswap) return res.json(pumpNotLoaded);
+  const token = (req.body.token || "").trim();
+  if (!token) return res.json({ ok: false, error: "No token provided" });
+  const deleted = pumpswap.removeScanned(token);
+  res.json({ ok: true, deleted });
 });
 
 // ─── WebSocket: Clanker (with heartbeat to prevent Railway proxy timeout) ────
