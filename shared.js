@@ -55,7 +55,6 @@ function injectLayout() {
         { href: 'discover.html', label: 'Discover', icon: 'D' },
         { href: 'token-scanner.html', label: 'Token Scanner', icon: 'T' },
         { href: 'overlap.html', label: 'Overlap', icon: 'O' },
-        { href: 'power-traders.html', label: 'Power Traders', icon: 'W' },
         { href: 'intel.html', label: 'Intel', icon: 'I' },
         { href: 'profile.html', label: 'Profile', icon: 'P' },
         { href: 'alerts.html', label: 'Alerts', icon: 'A' },
