@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { Connection, Keypair, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const bs58 = require("bs58");
+const { notify } = require("./notify");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PUMP_AMM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
@@ -272,6 +273,18 @@ async function executeBuy(tokenMint) {
       buysExecuted++;
       buyHistory.unshift({ token: mintStr, buyCount: buyCount + 1, amountSol: buyAmount, txHash: sig, dryRun: false, time: Date.now() });
       saveState();
+
+      notify("buy", "PumpSwap Buy Confirmed", `Bought **${mintStr.slice(0,8)}...** with **${buyAmount} SOL**`, {
+        key: `pump-buy:${mintStr}`,
+        chain: "SOL",
+        url: `https://solscan.io/tx/${sig}`,
+        fields: [
+          { name: "Token", value: `[${mintStr.slice(0,8)}...](https://solscan.io/token/${mintStr})` },
+          { name: "Amount", value: `${buyAmount} SOL` },
+          { name: "TX", value: `[${sig.slice(0,12)}...](https://solscan.io/tx/${sig})` },
+        ],
+      });
+
       return { txHash: sig };
     } catch (err) {
       log("error", `Buy failed: ${err.message}`);
@@ -297,6 +310,17 @@ async function processClaim(coinCreator, feeAmount, signature) {
   log("claim", `FEE CLAIM by ${creatorStr} (${feeSol.toFixed(6)} SOL)`);
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
   log("info", `Creator matches watched token(s): ${tokens.join(", ")}`);
+
+  notify("claim", "PumpSwap Fee Claim Detected", `Creator **${creatorStr.slice(0,8)}...** claimed **${feeSol.toFixed(4)} SOL**`, {
+    key: `pump-claim:${signature}`,
+    chain: "SOL",
+    url: `https://solscan.io/tx/${signature}`,
+    fields: [
+      { name: "Creator", value: `\`${creatorStr}\`` },
+      { name: "Fee", value: `${feeSol.toFixed(4)} SOL` },
+      { name: "Token(s)", value: tokens.map(t => `\`${t.slice(0,8)}...\``).join(", ") },
+    ],
+  });
 
   for (const tokenMint of tokens) {
     await executeBuy(new PublicKey(tokenMint));

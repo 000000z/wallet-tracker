@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { ethers } = require("ethers");
 const { WebSocketServer } = require("ws");
+const { notify } = require("./notify");
 let pumpswap;
 try {
   pumpswap = require("./pumpswap");
@@ -511,6 +512,19 @@ async function processClaim(event) {
     return;
   }
 
+  // Notify claim on watched token
+  const claimEth = isWethClaim ? ethers.formatEther(amountClaimed) : "N/A";
+  notify("claim", "Clanker Fee Claim Detected", `Claim on **${buyToken.slice(0,10)}...** — ${claimEth} ETH`, {
+    key: `clank-claim:${event.transactionHash}`,
+    chain: "BASE",
+    url: `https://basescan.org/tx/${event.transactionHash}`,
+    fields: [
+      { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
+      { name: "Owner", value: `\`${feeOwner.slice(0,10)}...\`` },
+      { name: "Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+    ],
+  });
+
   // Execute buy
   log("info", `  BUYING ${buyToken}... with ${config.buyAmountEth} ETH...`);
   const result = await executeBuy(buyToken, poolKey);
@@ -520,6 +534,18 @@ async function processClaim(event) {
     buysExecuted++;
     log("buy", `BUY COMPLETE for ${buyToken}...`);
     saveState();
+
+    const txHash = result.txHash || "";
+    notify("buy", "Clanker Buy Confirmed", `Bought **${buyToken.slice(0,10)}...** with **${config.buyAmountEth} ETH**`, {
+      key: `clank-buy:${buyToken}`,
+      chain: "BASE",
+      url: txHash ? `https://basescan.org/tx/${txHash}` : undefined,
+      fields: [
+        { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
+        { name: "Amount", value: `${config.buyAmountEth} ETH` },
+        { name: "TX", value: txHash ? `[${txHash.slice(0,14)}...](https://basescan.org/tx/${txHash})` : "dry run" },
+      ],
+    });
   }
 }
 
