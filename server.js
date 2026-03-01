@@ -452,51 +452,36 @@ async function processClaim(event) {
 
   claimsDetected++;
 
-  // Determine actual token (WETH fix)
-  let buyToken = token;
   const isWethClaim = token.toLowerCase() === WETH_BASE.toLowerCase();
 
-  if (isWethClaim) {
-    log("claim", `WETH FEE CLAIM from ${feeOwner}... (${ethers.formatEther(amountClaimed)} ETH)`);
-    log("info", "  Checking TX for actual token...");
-    const actualToken = await resolveTokenFromTx(event.transactionHash);
-    if (!actualToken) {
-      log("skip", `  SKIP: No token found in TX ${event.transactionHash}...`);
-      return;
-    }
-    buyToken = actualToken;
-    log("claim", `  Resolved token: ${buyToken}`);
-  } else {
-    log("claim", `CLAIM DETECTED: Token=${token} Owner=${feeOwner}`);
-  }
-
-  if (isWethClaim) {
-    log("claim", `  Claim Amount: ${ethers.formatEther(amountClaimed)} ETH`);
-  } else {
-    log("claim", `  Claim Amount: ${ethers.formatUnits(amountClaimed, 18)} tokens`);
-  }
-
-  // Filter: min claim (only applies to WETH claims — token amounts aren't comparable)
+  // Filter: min claim FIRST (cheap check, avoids expensive TX fetch)
   if (isWethClaim && amountClaimed < BigInt(config.minClaimAmountWei)) {
-    log("skip", `  SKIP: Claim below minimum (${ethers.formatEther(BigInt(config.minClaimAmountWei))} ETH)`);
-    return;
+    return; // silent skip — below minimum
   }
 
-  const buyTokenLower = buyToken.toLowerCase();
   const claimEth = isWethClaim ? ethers.formatEther(amountClaimed) : "N/A";
 
-  // No watched tokens → notify-only mode (no buys, no dedup)
+  // No watched tokens → lightweight notify-only mode (no TX fetch, no pool resolution)
   if (config.watchedTokens.length === 0) {
-    notify("claim", "Clanker Fee Claim", `**${buyToken.slice(0,10)}...** — ${claimEth} ETH`, {
+    // Fire-and-forget — don't block processing
+    notify("claim", "Clanker Fee Claim", `**${feeOwner.slice(0,10)}...** claimed ${claimEth} ETH`, {
       chain: "BASE",
       url: `https://basescan.org/tx/${event.transactionHash}`,
       fields: [
-        { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
         { name: "Owner", value: `\`${feeOwner.slice(0,10)}...\`` },
         { name: "Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
       ],
     });
     return;
+  }
+
+  // ── Watched mode: resolve actual token (requires TX fetch) ──
+  let buyToken = token;
+
+  if (isWethClaim) {
+    const actualToken = await resolveTokenFromTx(event.transactionHash);
+    if (!actualToken) return;
+    buyToken = actualToken;
   }
 
   // Filter: watched tokens
@@ -749,7 +734,20 @@ app.post("/api/sniper/stop", (req, res) => {
   res.json({ ok: true, status: "stopped" });
 });
 
+// Cache status to avoid hitting RPC on every poll
+let statusCache = { data: null, ts: 0 };
+const STATUS_CACHE_TTL = 10_000; // 10 seconds
+
 app.get("/api/sniper/status", async (req, res) => {
+  const now = Date.now();
+  if (statusCache.data && now - statusCache.ts < STATUS_CACHE_TTL) {
+    // Update counters from cache but use live counts
+    statusCache.data.claimsDetected = claimsDetected;
+    statusCache.data.buysExecuted = buysExecuted;
+    statusCache.data.running = sniperRunning;
+    return res.json(statusCache.data);
+  }
+
   let walletAddr = "";
   let balance = "";
   let currentBlock = lastBlock;
@@ -763,14 +761,9 @@ app.get("/api/sniper/status", async (req, res) => {
     } catch { /* ignore */ }
   }
 
-  res.json({
-    running: sniperRunning,
-    wallet: walletAddr,
-    balance,
-    block: currentBlock,
-    claimsDetected,
-    buysExecuted,
-  });
+  const data = { running: sniperRunning, wallet: walletAddr, balance, block: currentBlock, claimsDetected, buysExecuted };
+  statusCache = { data, ts: now };
+  res.json(data);
 });
 
 app.get("/api/sniper/config", (req, res) => {
