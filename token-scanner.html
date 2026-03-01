@@ -446,7 +446,7 @@ async function startScan() {
         const earlyCount = results.filter(r => r.tags.includes('EARLY')).length;
         const trackedCount = results.filter(r => r.isTracked).length;
         const whaleCount = results.filter(r => r.tags.includes('WHALE')).length;
-        document.getElementById('summaryCards').innerHTML = 
+        document.getElementById('summaryBar').innerHTML =
             '<div class="summary-stat"><div class="num">' + results.length + '</div><div class="label">Total found</div></div>' +
             '<div class="summary-stat"><div class="num yellow">' + earlyCount + '</div><div class="label">Early buyers</div></div>' +
             '<div class="summary-stat"><div class="num green">' + trackedCount + '</div><div class="label">Already tracked</div></div>' +
@@ -459,6 +459,83 @@ async function startScan() {
     document.getElementById('scanBtn').disabled = false;
 }
 
+
+// ─── Render Results Table ──────────────────────────────────────────────────
+function renderTable() {
+    const sorted = [...results].sort((a, b) => {
+        const av = a[currentSort.key], bv = b[currentSort.key];
+        if (typeof av === 'string') return currentSort.dir * av.localeCompare(bv);
+        return currentSort.dir * ((av || 0) - (bv || 0));
+    });
+
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = sorted.map(r => {
+        const short = shortAddr(r.address);
+        const solCls = r.solBalance === 0 ? 'sol-bal zero' : 'sol-bal';
+        const buyTimeStr = r.buyTime ? timeAgo(r.buyTime) : '--';
+        const buyTimeCls = r.buyTime && (Date.now() / 1000 - r.buyTime) < 3600 ? 'time-ago recent' : 'time-ago';
+        const tagHtml = r.tags.map(t => {
+            const cls = t === 'EARLY' ? 'early' : t === 'TRACKED' ? 'tracked' : t === 'WHALE' ? 'whale' : t === 'BOT' ? 'bot' : '';
+            return '<span class="badge ' + cls + '">' + t + '</span>';
+        }).join(' ');
+
+        return '<tr>' +
+            '<td><input type="checkbox" class="checkbox" data-addr="' + r.address + '" onchange="updateCount()"></td>' +
+            '<td class="' + buyTimeCls + '">' + buyTimeStr + '</td>' +
+            '<td class="addr"><a href="https://solscan.io/account/' + r.address + '" target="_blank">' + short + '</a> ' +
+                '<span class="copy-btn" onclick="copyAddr(\'' + r.address + '\')">copy</span></td>' +
+            '<td class="' + solCls + '">' + r.solBalance.toFixed(1) + '</td>' +
+            '<td>' + r.swapCount + '</td>' +
+            '<td>' + (r.totalSigs || '--') + '</td>' +
+            '<td>' + tagHtml + '</td>' +
+            '<td class="links">' +
+                '<a href="https://solscan.io/account/' + r.address + '" target="_blank" class="solscan">Solscan</a>' +
+                '<a href="https://birdeye.so/profile/' + r.address + '?chain=solana" target="_blank" class="birdeye">Birdeye</a>' +
+            '</td>' +
+        '</tr>';
+    }).join('');
+
+    // Save to localStorage
+    try {
+        const token = document.getElementById('tokenInput').value.trim();
+        localStorage.setItem('tokenscan_results', JSON.stringify({ token, results }));
+    } catch(e) {}
+}
+
+function updateCount() {
+    const count = document.querySelectorAll('#tbody .checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = count + ' selected';
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('#tbody .checkbox').forEach(cb => cb.checked = master.checked);
+    updateCount();
+}
+
+function exportSelected() {
+    const addrs = new Set();
+    document.querySelectorAll('#tbody .checkbox:checked').forEach(cb => addrs.add(cb.dataset.addr));
+    const data = results.filter(r => addrs.has(r.address));
+    if (!data.length) return showToast('Nothing selected');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'token-scan-export.json';
+    a.click();
+    showToast(data.length + ' wallets exported');
+}
+
+// ─── Column Sorting ───────────────────────────────────────────────────────
+document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (currentSort.key === key) currentSort.dir *= -1;
+        else { currentSort.key = key; currentSort.dir = 1; }
+        document.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
+        th.classList.add('sorted');
+        renderTable();
+    });
+});
 
 function copySelected() {
     const addrs = [];

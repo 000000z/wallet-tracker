@@ -739,8 +739,8 @@ app.post("/api/sniper/config", (req, res) => {
   const body = req.body;
   if (body.privateKey !== undefined) config.privateKey = body.privateKey;
   if (body.rpcUrl !== undefined) config.rpcUrl = body.rpcUrl;
-  if (body.buyAmountEth !== undefined) config.buyAmountEth = body.buyAmountEth;
-  if (body.slippagePct !== undefined) config.slippagePct = parseFloat(body.slippagePct);
+  if (body.buyAmountEth !== undefined) config.buyAmountEth = String(body.buyAmountEth).replace(",", ".");
+  if (body.slippagePct !== undefined) config.slippagePct = parseFloat(String(body.slippagePct).replace(",", "."));
   if (body.minClaimAmountWei !== undefined) config.minClaimAmountWei = body.minClaimAmountWei;
   if (body.pollIntervalMs !== undefined) config.pollIntervalMs = parseInt(body.pollIntervalMs, 10);
   if (body.maxBuysPerToken !== undefined) config.maxBuysPerToken = parseInt(body.maxBuysPerToken, 10);

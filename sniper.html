@@ -561,8 +561,8 @@ async function loadConfigToForm() {
 async function saveConfig() {
     const body = {
         rpcUrl: document.getElementById('cfgRpcUrl').value.trim(),
-        buyAmountEth: document.getElementById('cfgBuyAmount').value,
-        slippagePct: document.getElementById('cfgSlippage').value,
+        buyAmountEth: document.getElementById('cfgBuyAmount').value.replace(',', '.'),
+        slippagePct: document.getElementById('cfgSlippage').value.replace(',', '.'),
         minClaimAmountWei: document.getElementById('cfgMinClaim').value.trim(),
         pollIntervalMs: document.getElementById('cfgPollInterval').value,
         maxBuysPerToken: document.getElementById('cfgMaxBuys').value,

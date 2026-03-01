@@ -236,9 +236,9 @@ async function loadConfig() {
 async function saveConfig() {
     const body = {
         rpcUrl: document.getElementById('cfgRpcUrl').value,
-        buyAmountSol: document.getElementById('cfgBuyAmount').value,
-        slippagePct: document.getElementById('cfgSlippage').value,
-        priorityFeeSol: document.getElementById('cfgPriorityFee').value,
+        buyAmountSol: document.getElementById('cfgBuyAmount').value.replace(',', '.'),
+        slippagePct: document.getElementById('cfgSlippage').value.replace(',', '.'),
+        priorityFeeSol: document.getElementById('cfgPriorityFee').value.replace(',', '.'),
         maxBuysPerToken: document.getElementById('cfgMaxBuys').value,
         dryRun: document.getElementById('cfgDryRun').checked,
         watchedTokens: document.getElementById('cfgWatchedTokens').value,

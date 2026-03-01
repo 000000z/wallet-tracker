@@ -178,14 +178,15 @@ async function executeBuy(tokenMint) {
   const balanceSol = balance / LAMPORTS_PER_SOL;
   let buyAmount = config.buyAmountSol;
 
-  const overhead = config.priorityFeeSol + 0.01;
+  // Reserve: priority fee + base TX fee + token account rent + safety margin
+  const overhead = config.priorityFeeSol + 0.003 + 0.005;
   if (buyAmount + overhead > balanceSol) {
     const adjusted = balanceSol - overhead;
-    if (adjusted <= 0) {
-      log("error", `SKIP: Balance too low (${balanceSol.toFixed(4)} SOL)`);
+    if (adjusted <= 0.001) {
+      log("error", `SKIP: Balance too low (${balanceSol.toFixed(4)} SOL, need ${overhead.toFixed(4)} SOL overhead)`);
       return null;
     }
-    log("info", `All-in: adjusted buy from ${buyAmount} to ${adjusted.toFixed(4)} SOL`);
+    log("info", `All-in: adjusted buy from ${buyAmount} to ${adjusted.toFixed(4)} SOL (balance: ${balanceSol.toFixed(4)})`);
     buyAmount = parseFloat(adjusted.toFixed(4));
   }
 
@@ -205,56 +206,79 @@ async function executeBuy(tokenMint) {
     return { dryRun: true };
   }
 
-  log("info", `BUYING ${mintStr} with ${buyAmount} SOL (priority: ${priorityFee} SOL)...`);
+  log("info", `BUYING ${mintStr} with ${buyAmount} SOL (slippage: ${config.slippagePct}%, priority: ${priorityFee} SOL, balance: ${balanceSol.toFixed(4)})...`);
 
-  try {
-    const response = await fetch("https://pumpportal.fun/api/trade-local", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        publicKey: keypair.publicKey.toBase58(),
-        action: "buy",
-        mint: mintStr,
-        denominatedInSol: "true",
-        amount: buyAmount,
-        slippage: config.slippagePct,
-        priorityFee: priorityFee,
-        pool: "pump-amm",
-      }),
-    });
+  // Try buy, then retry once with higher slippage if it fails
+  const attempts = [config.slippagePct, Math.min(config.slippagePct * 2, 50)];
 
-    if (response.status !== 200) {
-      const text = await response.text();
-      log("error", `PumpPortal error (${response.status}): ${text}`);
+  for (let attempt = 0; attempt < attempts.length; attempt++) {
+    const slippage = attempts[attempt];
+    try {
+      const response = await fetch("https://pumpportal.fun/api/trade-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey: keypair.publicKey.toBase58(),
+          action: "buy",
+          mint: mintStr,
+          denominatedInSol: "true",
+          amount: buyAmount,
+          slippage: slippage,
+          priorityFee: priorityFee,
+          pool: "pump-amm",
+        }),
+      });
+
+      if (response.status !== 200) {
+        const text = await response.text();
+        log("error", `PumpPortal error (${response.status}): ${text}`);
+        return null;
+      }
+
+      const data = await response.arrayBuffer();
+      const tx = VersionedTransaction.deserialize(new Uint8Array(data));
+      tx.sign([keypair]);
+
+      const sig = await connection.sendTransaction(tx, { skipPreflight: true, maxRetries: 3 });
+      log("buy", `TX sent: ${sig}`);
+      log("info", "Waiting for confirmation...");
+
+      const confirmation = await connection.confirmTransaction(sig, "confirmed");
+      if (confirmation.value.err) {
+        const errJson = JSON.stringify(confirmation.value.err);
+        // Decode common PumpSwap errors
+        const customMatch = errJson.match(/"Custom":(\d+)/);
+        if (customMatch) {
+          const code = parseInt(customMatch[1]);
+          const errorNames = { 0: "InvalidInput", 1: "SlippageExceeded", 2: "InsufficientBalance", 6: "Overflow" };
+          const name = errorNames[code] || `Unknown(${code})`;
+          log("error", `TX failed: ${name} (Custom:${code}) — ${sig}`);
+
+          // Retry with higher slippage if this was a slippage error
+          if (code === 1 && attempt < attempts.length - 1) {
+            log("info", `Retrying with higher slippage (${attempts[attempt + 1]}%)...`);
+            continue;
+          }
+        } else {
+          log("error", `TX failed: ${errJson}`);
+        }
+        return null;
+      }
+
+      log("buy", `TX confirmed: ${sig}`);
+      log("buy", `Solscan: https://solscan.io/tx/${sig}`);
+
+      boughtTokens.set(mintStr, buyCount + 1);
+      buysExecuted++;
+      buyHistory.unshift({ token: mintStr, buyCount: buyCount + 1, amountSol: buyAmount, txHash: sig, dryRun: false, time: Date.now() });
+      saveState();
+      return { txHash: sig };
+    } catch (err) {
+      log("error", `Buy failed: ${err.message}`);
       return null;
     }
-
-    const data = await response.arrayBuffer();
-    const tx = VersionedTransaction.deserialize(new Uint8Array(data));
-    tx.sign([keypair]);
-
-    const sig = await connection.sendTransaction(tx, { skipPreflight: true, maxRetries: 3 });
-    log("buy", `TX sent: ${sig}`);
-    log("info", "Waiting for confirmation...");
-
-    const confirmation = await connection.confirmTransaction(sig, "confirmed");
-    if (confirmation.value.err) {
-      log("error", `TX failed: ${JSON.stringify(confirmation.value.err)}`);
-      return null;
-    }
-
-    log("buy", `TX confirmed: ${sig}`);
-    log("buy", `Solscan: https://solscan.io/tx/${sig}`);
-
-    boughtTokens.set(mintStr, buyCount + 1);
-    buysExecuted++;
-    buyHistory.unshift({ token: mintStr, buyCount: buyCount + 1, amountSol: buyAmount, txHash: sig, dryRun: false, time: Date.now() });
-    saveState();
-    return { txHash: sig };
-  } catch (err) {
-    log("error", `Buy failed: ${err.message}`);
-    return null;
   }
+  return null;
 }
 
 // ─── Process Claim ───────────────────────────────────────────────────────────
@@ -434,9 +458,9 @@ function getConfig() {
 function updateConfig(body) {
   if (body.privateKey !== undefined) config.privateKey = body.privateKey;
   if (body.rpcUrl !== undefined) config.rpcUrl = body.rpcUrl;
-  if (body.buyAmountSol !== undefined) config.buyAmountSol = parseFloat(body.buyAmountSol);
-  if (body.slippagePct !== undefined) config.slippagePct = parseFloat(body.slippagePct);
-  if (body.priorityFeeSol !== undefined) config.priorityFeeSol = parseFloat(body.priorityFeeSol);
+  if (body.buyAmountSol !== undefined) config.buyAmountSol = parseFloat(String(body.buyAmountSol).replace(",", "."));
+  if (body.slippagePct !== undefined) config.slippagePct = parseFloat(String(body.slippagePct).replace(",", "."));
+  if (body.priorityFeeSol !== undefined) config.priorityFeeSol = parseFloat(String(body.priorityFeeSol).replace(",", "."));
   if (body.maxBuysPerToken !== undefined) config.maxBuysPerToken = parseInt(body.maxBuysPerToken, 10);
   if (body.dryRun !== undefined) config.dryRun = body.dryRun === true || body.dryRun === "true";
   if (body.watchedTokens !== undefined) {
