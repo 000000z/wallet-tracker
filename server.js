@@ -108,6 +108,7 @@ let claimsDetected = 0;
 let buysExecuted = 0;
 let buyHistory = [];
 const boughtTokens = new Map();
+const scannedTokens = new Set(); // track tokens already processed (persisted in state)
 const poolKeyCache = new Map();
 
 let provider = null;
@@ -144,6 +145,7 @@ function loadState() {
       if (data.buyHistory) buyHistory = data.buyHistory;
       if (data.claimsDetected) claimsDetected = data.claimsDetected;
       if (data.buysExecuted) buysExecuted = data.buysExecuted;
+      if (data.scannedTokens) for (const t of data.scannedTokens) scannedTokens.add(t);
     }
   } catch (err) {
     console.error("Failed to load state:", err.message);
@@ -155,6 +157,7 @@ function saveState() {
     const data = {
       lastBlock,
       boughtTokens: Object.fromEntries(boughtTokens),
+      scannedTokens: [...scannedTokens],
       buyHistory,
       claimsDetected,
       buysExecuted,
@@ -488,9 +491,15 @@ async function processClaim(event) {
     }
   }
 
+  // Filter: already scanned this token (only process each token once)
+  const buyTokenLower = buyToken.toLowerCase();
+  if (scannedTokens.has(buyTokenLower)) {
+    return; // silent skip — already processed this token
+  }
+
   // Filter: blacklist
   if (config.blacklistedTokens.length > 0) {
-    const isBlacklisted = config.blacklistedTokens.some(b => b.toLowerCase() === buyToken.toLowerCase());
+    const isBlacklisted = config.blacklistedTokens.some(b => b.toLowerCase() === buyTokenLower);
     if (isBlacklisted) {
       log("skip", `  SKIP: Token ${buyToken}... is blacklisted`);
       return;
@@ -498,11 +507,15 @@ async function processClaim(event) {
   }
 
   // Filter: max buys
-  const buyCount = boughtTokens.get(buyToken.toLowerCase()) || 0;
+  const buyCount = boughtTokens.get(buyTokenLower) || 0;
   if (buyCount >= config.maxBuysPerToken) {
     log("skip", `  SKIP: Already bought ${buyToken}... ${buyCount}x (max: ${config.maxBuysPerToken})`);
     return;
   }
+
+  // Mark as scanned (persists across restarts)
+  scannedTokens.add(buyTokenLower);
+  saveState();
 
   // Resolve pool
   const amountIn = ethers.parseEther(config.buyAmountEth);
