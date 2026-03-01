@@ -482,20 +482,29 @@ async function processClaim(event) {
     return;
   }
 
-  // Filter: watched tokens
-  if (config.watchedTokens.length > 0) {
-    const isWatched = config.watchedTokens.some(w => w.toLowerCase() === buyToken.toLowerCase());
-    if (!isWatched) {
-      log("skip", `  SKIP: Token ${buyToken}... not in watched list`);
-      return;
-    }
+  const buyTokenLower = buyToken.toLowerCase();
+  const claimEth = isWethClaim ? ethers.formatEther(amountClaimed) : "N/A";
+
+  // No watched tokens → notify-only mode (no buys, no dedup)
+  if (config.watchedTokens.length === 0) {
+    notify("claim", "Clanker Fee Claim", `**${buyToken.slice(0,10)}...** — ${claimEth} ETH`, {
+      chain: "BASE",
+      url: `https://basescan.org/tx/${event.transactionHash}`,
+      fields: [
+        { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
+        { name: "Owner", value: `\`${feeOwner.slice(0,10)}...\`` },
+        { name: "Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+      ],
+    });
+    return;
   }
 
+  // Filter: watched tokens
+  const isWatched = config.watchedTokens.some(w => w.toLowerCase() === buyTokenLower);
+  if (!isWatched) return;
+
   // Filter: already scanned this token (only process each token once)
-  const buyTokenLower = buyToken.toLowerCase();
-  if (scannedTokens.has(buyTokenLower)) {
-    return; // silent skip — already processed this token
-  }
+  if (scannedTokens.has(buyTokenLower)) return;
 
   // Filter: blacklist
   if (config.blacklistedTokens.length > 0) {
@@ -526,7 +535,6 @@ async function processClaim(event) {
   }
 
   // Notify claim on watched token
-  const claimEth = isWethClaim ? ethers.formatEther(amountClaimed) : "N/A";
   notify("claim", "Clanker Fee Claim Detected", `Claim on **${buyToken.slice(0,10)}...** — ${claimEth} ETH`, {
     key: `clank-claim:${event.transactionHash}`,
     chain: "BASE",
