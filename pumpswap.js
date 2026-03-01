@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { Connection, Keypair, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const bs58 = require("bs58");
-const { notify } = require("./notify");
+const { notify, fetchTokenInfo, buildSocialFields } = require("./notify");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PUMP_AMM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
@@ -277,13 +277,19 @@ async function executeBuy(tokenMint) {
       buyHistory.unshift({ token: mintStr, buyCount: buyCount + 1, amountSol: buyAmount, txHash: sig, dryRun: false, time: Date.now() });
       saveState();
 
-      notify("buy", "\u{2705} PumpSwap Buy Confirmed", `Successfully bought token`, {
+      const buyTokenInfo = await fetchTokenInfo(mintStr);
+      const buyTokenLabel = buyTokenInfo?.name ? `**${buyTokenInfo.name}** (${buyTokenInfo.symbol})` : `\`${mintStr.slice(0,8)}...\``;
+
+      notify("buy", "\u{2705} PumpSwap Buy Confirmed", `Successfully bought ${buyTokenLabel}`, {
         key: `pump-buy:${mintStr}`,
         chain: "SOL",
         url: `https://solscan.io/tx/${sig}`,
+        thumbnail: buyTokenInfo?.image || undefined,
         fields: [
+          ...(buyTokenInfo?.name ? [{ name: "\u{1fa99} Token", value: buyTokenLabel, inline: false }] : []),
           { name: "\u{1f4cd} Contract", value: `\`${mintStr}\``, inline: false },
           { name: "\u{1f4b0} Amount", value: `${buyAmount} SOL` },
+          ...buildSocialFields(buyTokenInfo),
           { name: "\u{1f50d} TX", value: `[View on Solscan](https://solscan.io/tx/${sig})`, inline: false },
           { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${mintStr}\`\`\``, inline: false },
         ],
@@ -319,17 +325,26 @@ async function processClaim(coinCreator, feeAmount, signature) {
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
   log("info", `Creator matches watched token(s): ${unscannedTokens.join(", ")}`);
 
-  notify("claim", "\u{1f6a8} PumpSwap Fee Claim!", `Creator claimed fees on a **watched token**`, {
+  // Fetch socials for the first token
+  const tokenInfo = await fetchTokenInfo(unscannedTokens[0]);
+  const tokenLabel = tokenInfo?.name ? `**${tokenInfo.name}** (${tokenInfo.symbol})` : `\`${unscannedTokens[0].slice(0,8)}...\``;
+
+  const claimFields = [
+    ...(tokenInfo?.name ? [{ name: "\u{1fa99} Token", value: tokenLabel, inline: false }] : []),
+    { name: "\u{1f4cd} Contract", value: `\`${unscannedTokens[0]}\``, inline: false },
+    { name: "\u{1f464} Creator", value: `\`${creatorStr}\``, inline: false },
+    { name: "\u{1f4b0} Fee", value: `${feeSol.toFixed(4)} SOL` },
+    ...buildSocialFields(tokenInfo),
+    { name: "\u{1f50d} TX", value: `[View on Solscan](https://solscan.io/tx/${signature})`, inline: false },
+    { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${unscannedTokens[0]}\`\`\``, inline: false },
+  ];
+
+  notify("claim", "\u{1f6a8} PumpSwap Fee Claim!", `Creator claimed fees on ${tokenLabel}`, {
     key: `pump-claim:${signature}`,
     chain: "SOL",
     url: `https://solscan.io/tx/${signature}`,
-    fields: [
-      { name: "\u{1f464} Creator", value: `\`${creatorStr}\``, inline: false },
-      { name: "\u{1f4b0} Fee", value: `${feeSol.toFixed(4)} SOL` },
-      { name: "\u{1fa99} Token(s)", value: unscannedTokens.map(t => `\`${t}\``).join("\n"), inline: false },
-      { name: "\u{1f50d} TX", value: `[View on Solscan](https://solscan.io/tx/${signature})`, inline: false },
-      { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${unscannedTokens[0]}\`\`\``, inline: false },
-    ],
+    thumbnail: tokenInfo?.image || undefined,
+    fields: claimFields,
   });
 
   for (const tokenMint of unscannedTokens) {

@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { ethers } = require("ethers");
 const { WebSocketServer } = require("ws");
-const { notify } = require("./notify");
+const { notify, fetchTokenInfo, buildSocialFields } = require("./notify");
 let pumpswap;
 try {
   pumpswap = require("./pumpswap");
@@ -463,15 +463,28 @@ async function processClaim(event) {
 
   // No watched tokens → lightweight notify-only mode (no TX fetch, no pool resolution)
   if (config.watchedTokens.length === 0) {
-    // Fire-and-forget — don't block processing
-    notify("claim", "\u{1f4e1} Clanker Fee Claim", `**${feeOwner.slice(0,10)}...** claimed fees`, {
+    // Try to resolve token for socials (non-blocking — still sends if it fails)
+    const claimToken = !isWethClaim ? token : await resolveTokenFromTx(event.transactionHash).catch(() => null);
+    const tokenInfo = claimToken ? await fetchTokenInfo(claimToken) : null;
+    const tokenLabel = tokenInfo ? `**${tokenInfo.name}** (${tokenInfo.symbol})` : `**${feeOwner.slice(0,10)}...**`;
+
+    const fields = [
+      { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
+      { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+    ];
+    if (claimToken) {
+      fields.unshift({ name: "\u{1f4cd} Contract", value: `\`${claimToken}\``, inline: false });
+      if (tokenInfo?.name) fields.unshift({ name: "\u{1fa99} Token", value: tokenLabel, inline: false });
+    }
+    fields.push(...buildSocialFields(tokenInfo));
+    fields.push({ name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false });
+    if (claimToken) fields.push({ name: "\u{1f4cb} Quick Copy", value: `\`\`\`${claimToken}\`\`\``, inline: false });
+
+    notify("claim", "\u{1f4e1} Clanker Fee Claim", `${tokenLabel} claimed fees`, {
       chain: "BASE",
       url: `https://basescan.org/tx/${event.transactionHash}`,
-      fields: [
-        { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
-        { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
-        { name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false },
-      ],
+      thumbnail: tokenInfo?.image || undefined,
+      fields,
     });
     return;
   }
@@ -522,18 +535,27 @@ async function processClaim(event) {
     return;
   }
 
+  // Fetch socials for notification
+  const tokenInfo = await fetchTokenInfo(buyToken);
+  const tokenLabel = tokenInfo?.name ? `**${tokenInfo.name}** (${tokenInfo.symbol})` : `\`${buyToken.slice(0,10)}...\``;
+
   // Notify claim on watched token
-  notify("claim", "\u{1f6a8} Watched Token — Fee Claim!", `Claim detected on a **watched token**`, {
+  const claimFields = [
+    ...(tokenInfo?.name ? [{ name: "\u{1fa99} Token", value: tokenLabel, inline: false }] : []),
+    { name: "\u{1f4cd} Contract", value: `\`${buyToken}\``, inline: false },
+    { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
+    { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+    ...buildSocialFields(tokenInfo),
+    { name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false },
+    { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${buyToken}\`\`\``, inline: false },
+  ];
+
+  notify("claim", "\u{1f6a8} Watched Token — Fee Claim!", `Claim detected on ${tokenLabel}`, {
     key: `clank-claim:${event.transactionHash}`,
     chain: "BASE",
     url: `https://basescan.org/tx/${event.transactionHash}`,
-    fields: [
-      { name: "\u{1f4cd} Contract", value: `\`${buyToken}\``, inline: false },
-      { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
-      { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
-      { name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false },
-      { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${buyToken}\`\`\``, inline: false },
-    ],
+    thumbnail: tokenInfo?.image || undefined,
+    fields: claimFields,
   });
 
   // Execute buy
@@ -547,14 +569,17 @@ async function processClaim(event) {
     saveState();
 
     const txHash = result.txHash || "";
-    notify("buy", "\u{2705} Clanker Buy Confirmed", `Successfully bought token`, {
+    notify("buy", "\u{2705} Clanker Buy Confirmed", `Successfully bought ${tokenLabel}`, {
       key: `clank-buy:${buyToken}`,
       chain: "BASE",
       url: txHash ? `https://basescan.org/tx/${txHash}` : undefined,
+      thumbnail: tokenInfo?.image || undefined,
       fields: [
+        ...(tokenInfo?.name ? [{ name: "\u{1fa99} Token", value: tokenLabel, inline: false }] : []),
         { name: "\u{1f4cd} Contract", value: `\`${buyToken}\``, inline: false },
         { name: "\u{1f4b0} Amount", value: `${config.buyAmountEth} ETH` },
         { name: "\u{1f4ca} Tokens", value: `~${result.amountOut || "?"}` },
+        ...buildSocialFields(tokenInfo),
         { name: "\u{1f50d} TX", value: txHash ? `[View on BaseScan](https://basescan.org/tx/${txHash})` : "Dry run", inline: false },
         { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${buyToken}\`\`\``, inline: false },
       ],

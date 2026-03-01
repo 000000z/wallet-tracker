@@ -100,6 +100,73 @@ async function notify(type, title, description, opts = {}) {
   }
 }
 
+// ─── Token Info (DexScreener) ─────────────────────────────────────────────────
+const tokenInfoCache = new Map();
+const TOKEN_CACHE_TTL = 300_000; // 5 min
+
+/**
+ * Fetch token name, symbol, socials, and image from DexScreener
+ * @param {string} address - Token contract address
+ * @returns {{ name, symbol, image, twitter, telegram, website } | null}
+ */
+async function fetchTokenInfo(address) {
+  if (!address) return null;
+
+  const cached = tokenInfoCache.get(address.toLowerCase());
+  if (cached && Date.now() - cached.ts < TOKEN_CACHE_TTL) return cached.data;
+
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const pair = (json.pairs || [])[0];
+    if (!pair) return null;
+
+    const info = {
+      name: pair.baseToken?.name || null,
+      symbol: pair.baseToken?.symbol || null,
+      image: pair.info?.imageUrl || null,
+      twitter: null,
+      telegram: null,
+      website: null,
+    };
+
+    for (const s of (pair.info?.socials || [])) {
+      if (s.type === "twitter") info.twitter = s.url;
+      if (s.type === "telegram") info.telegram = s.url;
+    }
+    for (const w of (pair.info?.websites || [])) {
+      if (w.url && !info.website) info.website = w.url;
+    }
+
+    tokenInfoCache.set(address.toLowerCase(), { data: info, ts: Date.now() });
+    return info;
+  } catch (err) {
+    console.log(`[notify] DexScreener lookup failed for ${address}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Build social link fields from token info
+ * @param {object} info - Result from fetchTokenInfo
+ * @returns {Array} Array of embed fields for socials
+ */
+function buildSocialFields(info) {
+  if (!info) return [];
+  const fields = [];
+
+  if (info.twitter || info.telegram || info.website) {
+    const links = [];
+    if (info.twitter) links.push(`\u{1f426} [Twitter](${info.twitter})`);
+    if (info.telegram) links.push(`\u{1f4ac} [Telegram](${info.telegram})`);
+    if (info.website) links.push(`\u{1f310} [Website](${info.website})`);
+    fields.push({ name: "\u{1f517} Socials", value: links.join(" \u{2022} "), inline: false });
+  }
+
+  return fields;
+}
+
 // Clean up old cooldown entries every 5 minutes
 setInterval(() => {
   const cutoff = Date.now() - COOLDOWN_MS * 2;
@@ -108,4 +175,4 @@ setInterval(() => {
   }
 }, 300_000);
 
-module.exports = { notify };
+module.exports = { notify, fetchTokenInfo, buildSocialFields };
