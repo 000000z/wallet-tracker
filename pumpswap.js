@@ -277,14 +277,15 @@ async function executeBuy(tokenMint) {
       buyHistory.unshift({ token: mintStr, buyCount: buyCount + 1, amountSol: buyAmount, txHash: sig, dryRun: false, time: Date.now() });
       saveState();
 
-      notify("buy", "PumpSwap Buy Confirmed", `Bought **${mintStr.slice(0,8)}...** with **${buyAmount} SOL**`, {
+      notify("buy", "\u{2705} PumpSwap Buy Confirmed", `Successfully bought token`, {
         key: `pump-buy:${mintStr}`,
         chain: "SOL",
         url: `https://solscan.io/tx/${sig}`,
         fields: [
-          { name: "Token", value: `[${mintStr.slice(0,8)}...](https://solscan.io/token/${mintStr})` },
-          { name: "Amount", value: `${buyAmount} SOL` },
-          { name: "TX", value: `[${sig.slice(0,12)}...](https://solscan.io/tx/${sig})` },
+          { name: "\u{1f4cd} Contract", value: `\`${mintStr}\``, inline: false },
+          { name: "\u{1f4b0} Amount", value: `${buyAmount} SOL` },
+          { name: "\u{1f50d} TX", value: `[View on Solscan](https://solscan.io/tx/${sig})`, inline: false },
+          { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${mintStr}\`\`\``, inline: false },
         ],
       });
 
@@ -318,14 +319,16 @@ async function processClaim(coinCreator, feeAmount, signature) {
   log("info", `TX: ${signature} | Solscan: https://solscan.io/tx/${signature}`);
   log("info", `Creator matches watched token(s): ${unscannedTokens.join(", ")}`);
 
-  notify("claim", "PumpSwap Fee Claim Detected", `Creator **${creatorStr.slice(0,8)}...** claimed **${feeSol.toFixed(4)} SOL**`, {
+  notify("claim", "\u{1f6a8} PumpSwap Fee Claim!", `Creator claimed fees on a **watched token**`, {
     key: `pump-claim:${signature}`,
     chain: "SOL",
     url: `https://solscan.io/tx/${signature}`,
     fields: [
-      { name: "Creator", value: `\`${creatorStr}\`` },
-      { name: "Fee", value: `${feeSol.toFixed(4)} SOL` },
-      { name: "Token(s)", value: unscannedTokens.map(t => `\`${t.slice(0,8)}...\``).join(", ") },
+      { name: "\u{1f464} Creator", value: `\`${creatorStr}\``, inline: false },
+      { name: "\u{1f4b0} Fee", value: `${feeSol.toFixed(4)} SOL` },
+      { name: "\u{1fa99} Token(s)", value: unscannedTokens.map(t => `\`${t}\``).join("\n"), inline: false },
+      { name: "\u{1f50d} TX", value: `[View on Solscan](https://solscan.io/tx/${signature})`, inline: false },
+      { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${unscannedTokens[0]}\`\`\``, inline: false },
     ],
   });
 

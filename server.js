@@ -464,12 +464,13 @@ async function processClaim(event) {
   // No watched tokens → lightweight notify-only mode (no TX fetch, no pool resolution)
   if (config.watchedTokens.length === 0) {
     // Fire-and-forget — don't block processing
-    notify("claim", "Clanker Fee Claim", `**${feeOwner.slice(0,10)}...** claimed ${claimEth} ETH`, {
+    notify("claim", "\u{1f4e1} Clanker Fee Claim", `**${feeOwner.slice(0,10)}...** claimed fees`, {
       chain: "BASE",
       url: `https://basescan.org/tx/${event.transactionHash}`,
       fields: [
-        { name: "Owner", value: `\`${feeOwner.slice(0,10)}...\`` },
-        { name: "Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+        { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
+        { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+        { name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false },
       ],
     });
     return;
@@ -522,14 +523,16 @@ async function processClaim(event) {
   }
 
   // Notify claim on watched token
-  notify("claim", "Clanker Fee Claim Detected", `Claim on **${buyToken.slice(0,10)}...** — ${claimEth} ETH`, {
+  notify("claim", "\u{1f6a8} Watched Token — Fee Claim!", `Claim detected on a **watched token**`, {
     key: `clank-claim:${event.transactionHash}`,
     chain: "BASE",
     url: `https://basescan.org/tx/${event.transactionHash}`,
     fields: [
-      { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
-      { name: "Owner", value: `\`${feeOwner.slice(0,10)}...\`` },
-      { name: "Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+      { name: "\u{1f4cd} Contract", value: `\`${buyToken}\``, inline: false },
+      { name: "\u{1f464} Owner", value: `\`${feeOwner}\``, inline: false },
+      { name: "\u{1f4b0} Amount", value: isWethClaim ? `${claimEth} ETH` : "Token fees" },
+      { name: "\u{1f50d} TX", value: `[View on BaseScan](https://basescan.org/tx/${event.transactionHash})`, inline: false },
+      { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${buyToken}\`\`\``, inline: false },
     ],
   });
 
@@ -544,14 +547,16 @@ async function processClaim(event) {
     saveState();
 
     const txHash = result.txHash || "";
-    notify("buy", "Clanker Buy Confirmed", `Bought **${buyToken.slice(0,10)}...** with **${config.buyAmountEth} ETH**`, {
+    notify("buy", "\u{2705} Clanker Buy Confirmed", `Successfully bought token`, {
       key: `clank-buy:${buyToken}`,
       chain: "BASE",
       url: txHash ? `https://basescan.org/tx/${txHash}` : undefined,
       fields: [
-        { name: "Token", value: `[${buyToken.slice(0,10)}...](https://basescan.org/token/${buyToken})` },
-        { name: "Amount", value: `${config.buyAmountEth} ETH` },
-        { name: "TX", value: txHash ? `[${txHash.slice(0,14)}...](https://basescan.org/tx/${txHash})` : "dry run" },
+        { name: "\u{1f4cd} Contract", value: `\`${buyToken}\``, inline: false },
+        { name: "\u{1f4b0} Amount", value: `${config.buyAmountEth} ETH` },
+        { name: "\u{1f4ca} Tokens", value: `~${result.amountOut || "?"}` },
+        { name: "\u{1f50d} TX", value: txHash ? `[View on BaseScan](https://basescan.org/tx/${txHash})` : "Dry run", inline: false },
+        { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${buyToken}\`\`\``, inline: false },
       ],
     });
   }
@@ -953,10 +958,11 @@ server.listen(PORT, async () => {
   console.log(`WS:     ws://localhost:${PORT}/ws`);
 
   // Test Discord webhook on startup
-  notify("info", "Server Started", `Sniper server is online on port ${PORT}`, {
+  notify("info", "\u{1f680} Server Online", `Sniper server started successfully`, {
     fields: [
-      { name: "Clanker", value: config.watchedTokens.length > 0 ? `${config.watchedTokens.length} watched` : "Notify-only" },
-      { name: "PumpSwap", value: pumpswap ? "Loaded" : "Not loaded" },
+      { name: "\u{1f535} Clanker", value: config.watchedTokens.length > 0 ? `${config.watchedTokens.length} watched` : "Notify-only" },
+      { name: "\u{25ce} PumpSwap", value: pumpswap ? "Loaded" : "Not loaded" },
+      { name: "\u{2699}\u{fe0f} Dry Run", value: config.dryRun ? "ON" : "OFF" },
     ],
   });
 
