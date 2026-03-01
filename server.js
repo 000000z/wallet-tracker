@@ -463,8 +463,15 @@ async function processClaim(event) {
 
   // No watched tokens → lightweight notify-only mode (no TX fetch, no pool resolution)
   if (config.watchedTokens.length === 0) {
-    // Try to resolve token for socials (non-blocking — still sends if it fails)
+    // Resolve the actual token from TX (merges WETH + token fee events into one)
     const claimToken = !isWethClaim ? token : await resolveTokenFromTx(event.transactionHash).catch(() => null);
+
+    // Dedup: skip if we already notified for this token (or this TX if token unknown)
+    const dedupKey = claimToken ? claimToken.toLowerCase() : event.transactionHash.toLowerCase();
+    if (scannedTokens.has(dedupKey)) return;
+    scannedTokens.add(dedupKey);
+    saveState();
+
     const tokenInfo = claimToken ? await fetchTokenInfo(claimToken) : null;
     const tokenLabel = tokenInfo ? `**${tokenInfo.name}** (${tokenInfo.symbol})` : `**${feeOwner.slice(0,10)}...**`;
 
