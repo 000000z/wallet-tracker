@@ -450,8 +450,6 @@ async function resolveTokenFromTx(txHash) {
 async function processClaim(event) {
   const { feeOwner, token, amountClaimed } = event.args;
 
-  claimsDetected++;
-
   const isWethClaim = token.toLowerCase() === WETH_BASE.toLowerCase();
 
   // Filter: min claim FIRST (cheap check, avoids expensive TX fetch)
@@ -473,6 +471,8 @@ async function processClaim(event) {
     const dedupKey = claimToken.toLowerCase();
     if (scannedTokens.has(dedupKey)) return;
     scannedTokens.add(dedupKey);
+
+    claimsDetected++;
     saveState();
 
     const tokenInfo = claimToken ? await fetchTokenInfo(claimToken) : null;
@@ -535,6 +535,7 @@ async function processClaim(event) {
 
   // Mark as scanned (persists across restarts)
   scannedTokens.add(buyTokenLower);
+  claimsDetected++;
   saveState();
 
   // Resolve pool
