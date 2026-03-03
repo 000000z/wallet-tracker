@@ -99,13 +99,20 @@ function escapeHtml(str) {
 
 function clearLog() { logEl.innerHTML = ''; }
 
+// ─── Server URL (Railway backend) ────────────────────────────────────────────
+const RAILWAY_HOST = 'wallet-tracker-production-9f4b.up.railway.app';
+const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const isRailway = location.hostname === RAILWAY_HOST;
+const serverHost = isLocal ? location.host : RAILWAY_HOST;
+const serverBase = isLocal ? '' : 'https://' + RAILWAY_HOST;
+
 // ─── WebSocket ───────────────────────────────────────────────────────────────
 let ws = null;
 let wsRetryTimer = null;
 
 function connectWS() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(proto + '//' + location.host + '/ws-pumpfun');
+    const proto = isLocal ? 'ws:' : 'wss:';
+    ws = new WebSocket(proto + '//' + serverHost + '/ws-pumpfun');
 
     ws.onopen = () => {
         logEvent('info', 'WebSocket connected to server');
@@ -132,7 +139,7 @@ function connectWS() {
 // ─── Status Polling ──────────────────────────────────────────────────────────
 async function pollStatus() {
     try {
-        const res = await fetch('/api/pumpfun/status');
+        const res = await fetch(serverBase + '/api/pumpfun/status');
         const d = await res.json();
         const el = document.getElementById('statusVal');
         el.textContent = d.running ? 'Running' : 'Stopped';
@@ -145,14 +152,14 @@ async function pollStatus() {
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 async function startTracker() {
-    const res = await fetch('/api/pumpfun/start', { method: 'POST' });
+    const res = await fetch(serverBase + '/api/pumpfun/start', { method: 'POST' });
     const d = await res.json();
     if (!d.ok) logEvent('error', 'Start failed: ' + d.error);
     pollStatus();
 }
 
 async function stopTracker() {
-    await fetch('/api/pumpfun/stop', { method: 'POST' });
+    await fetch(serverBase + '/api/pumpfun/stop', { method: 'POST' });
     pollStatus();
 }
 
