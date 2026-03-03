@@ -60,6 +60,7 @@ function injectLayout() {
         { href: 'alerts.html', label: 'Alerts', icon: 'A' },
         { href: 'sniper.html', label: 'Claim Sniper', icon: 'S' },
         { href: 'pumpswap-sniper.html', label: 'Pump Sniper', icon: 'PS' },
+        { href: 'pumpfun-tracker.html', label: 'GitHub Tracker', icon: 'GH' },
     ];
     
     const navItems = pages.map(p => {

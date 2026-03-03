@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pump.fun GitHub Tracker</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+  h1 { color: #58a6ff; font-size: 1.3rem; padding: 16px 20px; border-bottom: 1px solid #21262d; }
+  h1 span { color: #8b949e; font-size: 0.8rem; margin-left: 8px; }
+
+  .status-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 16px 20px; border-bottom: 1px solid #21262d; }
+  .stat { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 12px; }
+  .stat-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-value { font-size: 1.1rem; color: #e6edf3; margin-top: 4px; }
+  .stat-value.running { color: #3fb950; }
+  .stat-value.stopped { color: #f85149; }
+
+  .controls { display: flex; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+  .btn { padding: 8px 20px; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.85rem; background: #161b22; color: #c9d1d9; transition: 0.15s; }
+  .btn:hover { background: #21262d; }
+  .btn-start { color: #3fb950; border-color: #238636; }
+  .btn-start:hover { background: #238636; color: #fff; }
+  .btn-stop { color: #f85149; border-color: #da3633; }
+  .btn-stop:hover { background: #da3633; color: #fff; }
+
+  .info-box { padding: 12px 20px; border-bottom: 1px solid #21262d; font-size: 0.8rem; color: #8b949e; line-height: 1.5; }
+  .info-box strong { color: #58a6ff; }
+
+  .log-section { padding: 16px 20px; }
+  .log-section h2 { font-size: 0.9rem; color: #f0883e; margin-bottom: 10px; }
+  #eventLog { background: #010409; border: 1px solid #21262d; border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto; font-size: 0.78rem; line-height: 1.6; }
+  .log-line { border-left: 3px solid #30363d; padding-left: 10px; margin-bottom: 2px; }
+  .log-line .ts { color: #484f58; margin-right: 6px; }
+  .log-line.github { border-color: #a371f7; color: #d2a8ff; }
+  .log-line.error { border-color: #f85149; color: #f85149; }
+  .log-line.info { border-color: #58a6ff; }
+  .log-line.skip { border-color: #8b949e; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<h1>Pump.fun GitHub Tracker <span>Solana</span></h1>
+
+<div class="status-bar">
+  <div class="stat">
+    <div class="stat-label">Status</div>
+    <div class="stat-value stopped" id="statusVal">Stopped</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Tokens Scanned</div>
+    <div class="stat-value" id="scannedVal">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">GitHub Tokens Found</div>
+    <div class="stat-value" id="githubVal" style="color:#a371f7">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Seen Mints (dedup)</div>
+    <div class="stat-value" id="seenVal">0</div>
+  </div>
+</div>
+
+<div class="info-box">
+  Monitors <strong>all</strong> new pump.fun token launches in real-time via PumpPortal WebSocket.
+  Fetches each token's IPFS metadata and checks for GitHub links.
+  When found, sends a Discord notification. <strong>No config needed</strong> &mdash; just start it.
+</div>
+
+<div class="controls">
+  <button class="btn btn-start" onclick="startTracker()">Start Tracker</button>
+  <button class="btn btn-stop" onclick="stopTracker()">Stop Tracker</button>
+  <button class="btn" onclick="clearLog()">Clear Log</button>
+</div>
+
+<div class="log-section">
+  <h2>EVENT LOG</h2>
+  <div id="eventLog"></div>
+</div>
+
+<script>
+const logEl = document.getElementById('eventLog');
+const MAX_LOG_LINES = 500;
+
+function logEvent(type, msg, ts) {
+    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = 'log-line ' + (type || 'info');
+    div.innerHTML = '<span class="ts">' + time + '</span> ' + escapeHtml(msg);
+    logEl.prepend(div);
+    while (logEl.children.length > MAX_LOG_LINES) logEl.removeChild(logEl.lastChild);
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function clearLog() { logEl.innerHTML = ''; }
+
+// ─── WebSocket ───────────────────────────────────────────────────────────────
+let ws = null;
+let wsRetryTimer = null;
+
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(proto + '//' + location.host + '/ws-pumpfun');
+
+    ws.onopen = () => {
+        logEvent('info', 'WebSocket connected to server');
+        if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null; }
+    };
+
+    ws.onmessage = (ev) => {
+        try {
+            const data = JSON.parse(ev.data);
+            logEvent(data.type || 'info', data.msg || '', data.ts);
+        } catch {
+            logEvent('info', ev.data);
+        }
+    };
+
+    ws.onclose = () => {
+        logEvent('error', 'WebSocket disconnected - reconnecting in 3s...');
+        wsRetryTimer = setTimeout(connectWS, 3000);
+    };
+
+    ws.onerror = () => { ws.close(); };
+}
+
+// ─── Status Polling ──────────────────────────────────────────────────────────
+async function pollStatus() {
+    try {
+        const res = await fetch('/api/pumpfun/status');
+        const d = await res.json();
+        const el = document.getElementById('statusVal');
+        el.textContent = d.running ? 'Running' : 'Stopped';
+        el.className = 'stat-value ' + (d.running ? 'running' : 'stopped');
+        document.getElementById('scannedVal').textContent = d.tokensScanned || 0;
+        document.getElementById('githubVal').textContent = d.githubTokensFound || 0;
+        document.getElementById('seenVal').textContent = d.seenMints || 0;
+    } catch {}
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+async function startTracker() {
+    const res = await fetch('/api/pumpfun/start', { method: 'POST' });
+    const d = await res.json();
+    if (!d.ok) logEvent('error', 'Start failed: ' + d.error);
+    pollStatus();
+}
+
+async function stopTracker() {
+    await fetch('/api/pumpfun/stop', { method: 'POST' });
+    pollStatus();
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+connectWS();
+pollStatus();
+setInterval(pollStatus, 15000);
+</script>
+<script src="shared.js"></script>
+</body>
+</html>
