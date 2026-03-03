@@ -5,7 +5,54 @@
 const fs = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
-const { notify, buildSocialFields } = require("./notify");
+
+// ─── Own Discord Webhook (separate channel) ─────────────────────────────────
+const WEBHOOK_URL = (process.env.PUMPFUN_DISCORD_WEBHOOK || "").trim();
+console.log(`[PUMP.FUN] Discord webhook ${WEBHOOK_URL ? "loaded" : "NOT SET"}`);
+
+const cooldowns = new Map();
+const COOLDOWN_MS = 60_000;
+const COLORS = { github: 0xa371f7, info: 0x58a6ff, error: 0xf85149 };
+
+async function sendDiscord(type, title, description, opts = {}) {
+  if (!WEBHOOK_URL) return;
+  if (opts.key) {
+    const last = cooldowns.get(opts.key);
+    if (last && Date.now() - last < COOLDOWN_MS) return;
+    cooldowns.set(opts.key, Date.now());
+  }
+
+  const embed = {
+    title: title.slice(0, 256),
+    description: (description || "").slice(0, 4096),
+    color: COLORS[type] || COLORS.info,
+    timestamp: new Date().toISOString(),
+  };
+  if (opts.fields) embed.fields = opts.fields.slice(0, 25).map(f => ({
+    name: String(f.name).slice(0, 256), value: String(f.value).slice(0, 1024), inline: f.inline !== false,
+  }));
+  if (opts.url) embed.url = opts.url;
+  if (opts.thumbnail) embed.thumbnail = { url: opts.thumbnail };
+  if (opts.chain) embed.footer = { text: `${{ SOL: "\u25ce", BASE: "\ud83d\udfe2" }[opts.chain] || ""} ${opts.chain}` };
+
+  try {
+    const resp = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
+    if (resp.status === 429) {
+      const data = await resp.json().catch(() => ({}));
+      await new Promise(r => setTimeout(r, (data.retry_after || 1) * 1000));
+      await fetch(WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ embeds: [embed] }) });
+    }
+  } catch (err) {
+    console.error(`[PUMP.FUN] Discord error: ${err.message}`);
+  }
+}
+
+// Clean old cooldowns
+setInterval(() => { for (const [k, ts] of cooldowns) if (ts < Date.now() - COOLDOWN_MS * 2) cooldowns.delete(k); }, 300_000);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PUMPPORTAL_WS = "wss://pumpportal.fun/api/data";
@@ -185,8 +232,8 @@ async function processNewToken(tokenData) {
     inline: false,
   });
 
-  // Send Discord notification
-  notify("info", "\u{1f4bb} New GitHub Token on Pump.fun", `**${name}** (${symbol}) launched with a GitHub link`, {
+  // Send Discord notification (own channel)
+  sendDiscord("github", "\u{1f4bb} New GitHub Token on Pump.fun", `**${name}** (${symbol}) launched with a GitHub link`, {
     key: `pumpfun-github:${mint}`,
     chain: "SOL",
     url: `https://pump.fun/coin/${mint}`,
