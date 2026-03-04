@@ -14,11 +14,59 @@ try {
   pumpswap = null;
 }
 
+let pumpfunTracker;
+try {
+  pumpfunTracker = require("./pumpfun-tracker");
+  pumpfunTracker.init((entry) => {
+    const payload = JSON.stringify(entry);
+    for (const client of wssPumpfun.clients) {
+      if (client.readyState === 1) client.send(payload);
+    }
+  });
+  console.log("[PUMP.FUN] Tracker module loaded");
+} catch (err) {
+  console.error("[PUMP.FUN] Failed to load tracker module:", err.message);
+  pumpfunTracker = null;
+}
+
+let afkSniper;
+try {
+  afkSniper = require("./afk-sniper");
+  afkSniper.init((entry) => {
+    const payload = JSON.stringify(entry);
+    for (const client of wssAfk.clients) {
+      if (client.readyState === 1) client.send(payload);
+    }
+  });
+  console.log("[AFK] Sniper module loaded");
+} catch (err) {
+  console.error("[AFK] Failed to load sniper module:", err.message);
+  afkSniper = null;
+}
+
+let fourmemeSniper;
+try {
+  fourmemeSniper = require("./fourmeme-sniper");
+  fourmemeSniper.init((entry) => {
+    const payload = JSON.stringify(entry);
+    for (const client of wssFourmeme.clients) {
+      if (client.readyState === 1) client.send(payload);
+    }
+  });
+  console.log("[4MEME] Sniper module loaded");
+} catch (err) {
+  console.error("[4MEME] Failed to load sniper module:", err.message);
+  fourmemeSniper = null;
+}
+
 // ─── Express + HTTP + WebSocket Setup ────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 const wssPump = new WebSocketServer({ noServer: true });
+const wssPumpfun = new WebSocketServer({ noServer: true });
+const wssAfk = new WebSocketServer({ noServer: true });
+const wssFourmeme = new WebSocketServer({ noServer: true });
 
 // Route WebSocket upgrades by path
 server.on("upgrade", (req, socket, head) => {
@@ -27,6 +75,12 @@ server.on("upgrade", (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
   } else if (pathname === "/ws-pump") {
     wssPump.handleUpgrade(req, socket, head, (ws) => wssPump.emit("connection", ws, req));
+  } else if (pathname === "/ws-pumpfun") {
+    wssPumpfun.handleUpgrade(req, socket, head, (ws) => wssPumpfun.emit("connection", ws, req));
+  } else if (pathname === "/ws-afk") {
+    wssAfk.handleUpgrade(req, socket, head, (ws) => wssAfk.emit("connection", ws, req));
+  } else if (pathname === "/ws-fourmeme") {
+    wssFourmeme.handleUpgrade(req, socket, head, (ws) => wssFourmeme.emit("connection", ws, req));
   } else {
     socket.destroy();
   }
@@ -917,6 +971,79 @@ app.post("/api/pumpswap/scanned/remove", (req, res) => {
   res.json({ ok: true, deleted });
 });
 
+// ─── Pump.fun GitHub Tracker API ─────────────────────────────────────────────
+app.post("/api/pumpfun/start", (req, res) => {
+  if (!pumpfunTracker) return res.status(500).json({ ok: false, error: "Tracker module not loaded" });
+  try { pumpfunTracker.startTracker(); res.json({ ok: true, status: "running" }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post("/api/pumpfun/stop", (req, res) => {
+  if (!pumpfunTracker) return res.status(500).json({ ok: false, error: "Tracker module not loaded" });
+  pumpfunTracker.stopTracker(); res.json({ ok: true, status: "stopped" });
+});
+app.get("/api/pumpfun/status", (req, res) => {
+  if (!pumpfunTracker) return res.json({ running: false, tokensScanned: 0, githubTokensFound: 0, seenMints: 0 });
+  res.json(pumpfunTracker.getStatus());
+});
+
+// ─── AFK Creator Sniper API ─────────────────────────────────────────────────
+app.post("/api/afk/start", async (req, res) => {
+  if (!afkSniper) return res.status(500).json({ ok: false, error: "AFK Sniper module not loaded" });
+  try { await afkSniper.startSniper(); res.json({ ok: true, status: "running" }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post("/api/afk/stop", (req, res) => {
+  if (!afkSniper) return res.status(500).json({ ok: false, error: "AFK Sniper module not loaded" });
+  afkSniper.stopSniper(); res.json({ ok: true, status: "stopped" });
+});
+app.get("/api/afk/status", async (req, res) => {
+  if (!afkSniper) return res.json({ running: false, launchesDetected: 0, buysExecuted: 0, watchedCreators: 0 });
+  const s = afkSniper.getStatus();
+  s.balance = await afkSniper.refreshBalance();
+  res.json(s);
+});
+app.get("/api/afk/config", (req, res) => {
+  if (!afkSniper) return res.json({});
+  res.json(afkSniper.getConfig());
+});
+app.post("/api/afk/config", (req, res) => {
+  if (!afkSniper) return res.status(500).json({ ok: false, error: "AFK Sniper module not loaded" });
+  afkSniper.updateConfig(req.body); res.json({ ok: true });
+});
+app.get("/api/afk/history", (req, res) => {
+  if (!afkSniper) return res.json([]);
+  res.json(afkSniper.getHistory());
+});
+
+// ─── Four.Meme Agent Sniper API ─────────────────────────────────────────────
+app.post("/api/fourmeme/start", async (req, res) => {
+  if (!fourmemeSniper) return res.status(500).json({ ok: false, error: "Four.Meme Sniper module not loaded" });
+  try { await fourmemeSniper.startSniper(); res.json({ ok: true, status: "running" }); }
+  catch (err) { res.status(400).json({ ok: false, error: err.message }); }
+});
+app.post("/api/fourmeme/stop", (req, res) => {
+  if (!fourmemeSniper) return res.status(500).json({ ok: false, error: "Four.Meme Sniper module not loaded" });
+  fourmemeSniper.stopSniper(); res.json({ ok: true, status: "stopped" });
+});
+app.get("/api/fourmeme/status", async (req, res) => {
+  if (!fourmemeSniper) return res.json({ running: false, tokensDetected: 0, agentTokens: 0, buysExecuted: 0 });
+  const s = fourmemeSniper.getStatus();
+  s.balance = await fourmemeSniper.refreshBalance();
+  res.json(s);
+});
+app.get("/api/fourmeme/config", (req, res) => {
+  if (!fourmemeSniper) return res.json({});
+  res.json(fourmemeSniper.getConfig());
+});
+app.post("/api/fourmeme/config", (req, res) => {
+  if (!fourmemeSniper) return res.status(500).json({ ok: false, error: "Four.Meme Sniper module not loaded" });
+  fourmemeSniper.updateConfig(req.body); res.json({ ok: true });
+});
+app.get("/api/fourmeme/history", (req, res) => {
+  if (!fourmemeSniper) return res.json([]);
+  res.json(fourmemeSniper.getHistory());
+});
+
 // ─── WebSocket: Clanker (with heartbeat to prevent Railway proxy timeout) ────
 wss.on("connection", (ws) => {
   console.log("WebSocket client connected (Clanker)");
@@ -959,9 +1086,66 @@ wssPump.on("connection", (ws) => {
   }
 });
 
+// ─── WebSocket: Pump.fun GitHub Tracker ─────────────────────────────────────
+wssPumpfun.on("connection", (ws) => {
+  console.log("WebSocket client connected (Pump.fun Tracker)");
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
+  if (pumpfunTracker) {
+    for (const entry of pumpfunTracker.getLogBuffer()) {
+      ws.send(JSON.stringify(entry));
+    }
+  }
+  const pfStatus = pumpfunTracker ? pumpfunTracker.getStatus() : { running: false };
+  ws.send(JSON.stringify({
+    type: "info",
+    msg: `Connected to pump.fun tracker. Status: ${pfStatus.running ? "Running" : "Stopped"}`,
+    ts: new Date().toISOString(),
+  }));
+});
+
+// ─── WebSocket: AFK Creator Sniper ──────────────────────────────────────────
+wssAfk.on("connection", (ws) => {
+  console.log("WebSocket client connected (AFK Sniper)");
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
+  if (afkSniper) {
+    for (const entry of afkSniper.getLogBuffer()) {
+      ws.send(JSON.stringify(entry));
+    }
+  }
+  const afkStatus = afkSniper ? afkSniper.getStatus() : { running: false };
+  ws.send(JSON.stringify({
+    type: "info",
+    msg: `Connected to AFK Sniper. Status: ${afkStatus.running ? "Running" : "Stopped"}`,
+    ts: new Date().toISOString(),
+  }));
+});
+
+// ─── WebSocket: Four.Meme Agent Sniper ──────────────────────────────────────
+wssFourmeme.on("connection", (ws) => {
+  console.log("WebSocket client connected (Four.Meme Sniper)");
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
+  if (fourmemeSniper) {
+    for (const entry of fourmemeSniper.getLogBuffer()) {
+      ws.send(JSON.stringify(entry));
+    }
+  }
+  const fmStatus = fourmemeSniper ? fourmemeSniper.getStatus() : { running: false };
+  ws.send(JSON.stringify({
+    type: "info",
+    msg: `Connected to Four.Meme Sniper. Status: ${fmStatus.running ? "Running" : "Stopped"}`,
+    ts: new Date().toISOString(),
+  }));
+});
+
 // Ping every 25s to keep connections alive through Railway's proxy
 const heartbeat = setInterval(() => {
-  [wss, wssPump].forEach(server => {
+  [wss, wssPump, wssPumpfun, wssAfk, wssFourmeme].forEach(server => {
     server.clients.forEach((ws) => {
       if (!ws.isAlive) return ws.terminate();
       ws.isAlive = false;
@@ -976,6 +1160,9 @@ function shutdown() {
   console.log("\nShutting down...");
   stopSniper();
   if (pumpswap) pumpswap.stopSniper();
+  if (pumpfunTracker) try { pumpfunTracker.stopTracker(); } catch {}
+  if (afkSniper) try { afkSniper.stopSniper(); } catch {}
+  if (fourmemeSniper) try { fourmemeSniper.stopSniper(); } catch {}
   server.close();
   process.exit(0);
 }
