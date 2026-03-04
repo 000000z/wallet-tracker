@@ -119,11 +119,6 @@
     <input type="text" id="cfgSlippage" placeholder="25">
   </div>
   <div>
-    <label>Poll Interval (ms)</label>
-    <input type="text" id="cfgPollInterval" placeholder="3000">
-    <div class="hint">BSC block time is ~3s. Lower = faster detection.</div>
-  </div>
-  <div>
     <label>Dry Run</label>
     <div class="toggle-wrap">
       <label class="toggle">
@@ -232,7 +227,6 @@ async function loadConfig() {
         document.getElementById('cfgRpcUrl').value = c.rpcUrl || '';
         document.getElementById('cfgBuyAmount').value = c.buyAmountBnb || '';
         document.getElementById('cfgSlippage').value = c.slippagePct || '';
-        document.getElementById('cfgPollInterval').value = c.pollIntervalMs || '';
         document.getElementById('cfgDryRun').checked = c.dryRun;
         updateToggles();
         document.getElementById('cfgWatchedCreators').value = (c.watchedCreators || []).join('\n');
@@ -245,7 +239,6 @@ async function saveConfig() {
         rpcUrl: document.getElementById('cfgRpcUrl').value,
         buyAmountBnb: document.getElementById('cfgBuyAmount').value.replace(',', '.'),
         slippagePct: document.getElementById('cfgSlippage').value.replace(',', '.'),
-        pollIntervalMs: document.getElementById('cfgPollInterval').value,
         dryRun: document.getElementById('cfgDryRun').checked,
         watchedCreators: document.getElementById('cfgWatchedCreators').value,
     };
