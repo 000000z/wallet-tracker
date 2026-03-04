@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.env.local
+state.json
+fourmeme-sniper-state.json
+afk-sniper-state.json
+.claude/
+memory/
