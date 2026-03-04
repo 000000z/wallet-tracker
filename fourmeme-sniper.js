@@ -15,7 +15,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 // ─── ABIs ─────────────────────────────────────────────────────────────────────
 const TM2_ABI = [
-  "event TokenCreate(address indexed creator, address indexed token, uint256 requestId, string name, string symbol, uint256 totalSupply, uint256 launchTime, uint256 launchFee)",
+  "event TokenCreate(address creator, address token, uint256 requestId, string name, string symbol, uint256 totalSupply, uint256 launchTime, uint256 launchFee)",
   "function buyTokenAMAP(address token, uint256 funds, uint256 minAmount) payable",
   "function buyToken(address token, uint256 amount, uint256 maxFunds) payable",
 ];
