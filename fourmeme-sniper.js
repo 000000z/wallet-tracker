@@ -52,6 +52,7 @@ async function sendDiscord(type, title, description, opts = {}) {
   }));
   if (opts.url) embed.url = opts.url;
   if (opts.footer) embed.footer = { text: opts.footer };
+  if (opts.thumbnail) embed.thumbnail = { url: opts.thumbnail };
 
   try {
     const resp = await fetch(WEBHOOK_URL, {
@@ -197,15 +198,16 @@ async function executeBuy(tokenAddress, creatorAddress, tokenName, tokenSymbol, 
       amountBnb: buyAmount, txHash: "", dryRun: true, isAgent, time: Date.now(),
     });
     saveState();
-    sendDiscord("buy", `DRY RUN: Would Snipe ${tokenName}`, `**${tokenName}** (${tokenSymbol})${isAgent ? " [AGENT]" : ""}`, {
+    sendDiscord("buy", `\u{1f9ea} DRY RUN: ${tokenName} (${tokenSymbol})`, `Would buy **${tokenName}** (${tokenSymbol}) with ${buyAmount} BNB`, {
       fields: [
-        { name: "Token", value: `\`${tokenAddress}\`` },
-        { name: "Creator", value: `\`${creatorAddress}\`` },
-        { name: "Amount", value: `${buyAmount} BNB` },
-        { name: "Mode", value: isAgent ? "Insider Phase (Agent)" : "Public" },
+        { name: "\u{1fa99} Token", value: `**${tokenName}** (${tokenSymbol})`, inline: false },
+        { name: "\u{1f4cd} Contract", value: `\`${tokenAddress}\``, inline: false },
+        { name: "\u{1f4b0} Amount", value: `${buyAmount} BNB` },
+        { name: "\u{1f50d} Links", value: `[Four.Meme](https://four.meme/token/${tokenAddress}) \u2022 [BscScan](https://bscscan.com/token/${tokenAddress})`, inline: false },
+        { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${tokenAddress}\`\`\``, inline: false },
       ],
       url: `https://four.meme/token/${tokenAddress}`,
-      footer: "BNB Chain | Four.Meme",
+      footer: "\u25ce BNB",
     });
     return { dryRun: true };
   }
@@ -255,15 +257,17 @@ async function executeBuy(tokenAddress, creatorAddress, tokenName, tokenSymbol, 
     });
     saveState();
 
-    sendDiscord("buy", `Sniped: ${tokenName} (${tokenSymbol})`, `${isAgent ? "**INSIDER PHASE** — Agent token sniped!" : "Token sniped on launch!"}`, {
+    sendDiscord("buy", `\u2705 Sniped: ${tokenName} (${tokenSymbol})`, `Bought **${tokenName}** (${tokenSymbol}) for ${buyAmount} BNB`, {
       fields: [
-        { name: "Token", value: `\`${tokenAddress}\`` },
-        { name: "Creator", value: `\`${creatorAddress}\`` },
-        { name: "Amount", value: `${buyAmount} BNB` },
-        { name: "TX", value: `[BscScan](https://bscscan.com/tx/${tx.hash})` },
+        { name: "\u{1fa99} Token", value: `**${tokenName}** (${tokenSymbol})`, inline: false },
+        { name: "\u{1f4cd} Contract", value: `\`${tokenAddress}\``, inline: false },
+        { name: "\u{1f4b0} Amount", value: `${buyAmount} BNB` },
+        { name: "\u{1f4ca} Tokens", value: `~${ethers.formatEther(estimatedAmount)}` },
+        { name: "\u{1f50d} Links", value: `[Four.Meme](https://four.meme/token/${tokenAddress}) \u2022 [BscScan](https://bscscan.com/tx/${tx.hash})`, inline: false },
+        { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${tokenAddress}\`\`\``, inline: false },
       ],
       url: `https://four.meme/token/${tokenAddress}`,
-      footer: "BNB Chain | Four.Meme",
+      footer: "\u25ce BNB",
     });
 
     return { txHash: tx.hash };
@@ -288,22 +292,35 @@ async function processTokenCreate(event) {
   log("info", `  Four.Meme: https://four.meme/token/${token}`);
 
   // ── Agent check runs in background, never blocks buy path ──
-  isAgentWallet(creator).then(isAgent => {
-    if (isAgent) {
-      agentTokensDetected++;
-      log("info", `  [AGENT] ${name} (${symbol}) — creator holds 8004 NFT`);
-      sendDiscord("agent",
-        `AGENT Token: ${name} (${symbol})`,
-        `**Agent-created token detected** — insider phase active!`, {
-        fields: [
-          { name: "Token", value: `\`${token}\`` },
-          { name: "Creator", value: `\`${creator}\` (Agent)` },
-          { name: "Links", value: `[Four.Meme](https://four.meme/token/${token}) | [BscScan](https://bscscan.com/token/${token})` },
-        ],
-        url: `https://four.meme/token/${token}`,
-        footer: "BNB Chain | Four.Meme",
-      });
-    }
+  isAgentWallet(creator).then(async (isAgent) => {
+    if (!isAgent) return;
+    agentTokensDetected++;
+    log("info", `  [AGENT] ${name} (${symbol}) — creator holds 8004 NFT`);
+
+    // Fetch token image from Four.Meme API
+    let imageUrl = null;
+    try {
+      const resp = await fetch(`https://four.meme/meme-api/v1/public/token/info?address=${token}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.data?.image) imageUrl = data.data.image;
+      }
+    } catch {}
+
+    sendDiscord("agent",
+      `\uD83E\uDD16 Agent Token on Four.Meme`,
+      `**${name}** (${symbol}) launched by an AI Agent`, {
+      fields: [
+        { name: "\uD83E\uDE99 Token", value: `**${name}** (${symbol})`, inline: false },
+        { name: "\uD83D\uDCCD Contract", value: `\`${token}\``, inline: false },
+        { name: "\uD83D\uDC64 Creator", value: `\`${creator}\``, inline: false },
+        { name: "\uD83D\uDD0D Links", value: `[Four.Meme](https://four.meme/token/${token}) \u2022 [BscScan](https://bscscan.com/token/${token})`, inline: false },
+        { name: "\uD83D\uDCCB Quick Copy", value: `\`\`\`${token}\`\`\``, inline: false },
+      ],
+      url: `https://four.meme/token/${token}`,
+      footer: "\u25CE BNB",
+      thumbnail: imageUrl,
+    });
   }).catch(() => {});
 
   // ── Buy decision: only if creator is on watched list (instant, no RPC) ──
