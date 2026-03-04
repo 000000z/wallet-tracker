@@ -282,36 +282,32 @@ async function processTokenCreate(event) {
 
   tokensDetected++;
 
-  // Check if creator is an agent wallet
-  const isAgent = await isAgentWallet(creator);
-  if (isAgent) agentTokensDetected++;
-
-  const tag = isAgent ? " [AGENT]" : "";
-  log("claim", `NEW TOKEN${tag}: ${name} (${symbol})`);
+  log("claim", `NEW TOKEN: ${name} (${symbol})`);
   log("info", `  Token: ${token}`);
   log("info", `  Creator: ${creator}`);
   log("info", `  Four.Meme: https://four.meme/token/${token}`);
 
-  // ── Discord notification for agent tokens (always, separate from buy) ──
-  if (isAgent) {
-    sendDiscord("agent",
-      `AGENT Token: ${name} (${symbol})`,
-      `**Agent-created token detected** — insider phase active!`, {
-      fields: [
-        { name: "Token", value: `\`${token}\`` },
-        { name: "Creator", value: `\`${creator}\` (Agent)` },
-        { name: "Links", value: `[Four.Meme](https://four.meme/token/${token}) | [BscScan](https://bscscan.com/token/${token})` },
-      ],
-      url: `https://four.meme/token/${token}`,
-      footer: "BNB Chain | Four.Meme",
-    });
-  }
+  // ── Agent check runs in background, never blocks buy path ──
+  isAgentWallet(creator).then(isAgent => {
+    if (isAgent) {
+      agentTokensDetected++;
+      log("info", `  [AGENT] ${name} (${symbol}) — creator holds 8004 NFT`);
+      sendDiscord("agent",
+        `AGENT Token: ${name} (${symbol})`,
+        `**Agent-created token detected** — insider phase active!`, {
+        fields: [
+          { name: "Token", value: `\`${token}\`` },
+          { name: "Creator", value: `\`${creator}\` (Agent)` },
+          { name: "Links", value: `[Four.Meme](https://four.meme/token/${token}) | [BscScan](https://bscscan.com/token/${token})` },
+        ],
+        url: `https://four.meme/token/${token}`,
+        footer: "BNB Chain | Four.Meme",
+      });
+    }
+  }).catch(() => {});
 
-  // ── Buy decision: only if creator is on watched list ──
-  if (watchedSet.size === 0) {
-    // No watched creators configured — just notify, never buy
-    return;
-  }
+  // ── Buy decision: only if creator is on watched list (instant, no RPC) ──
+  if (watchedSet.size === 0) return;
 
   if (!watchedSet.has(creator.toLowerCase())) {
     log("skip", `  SKIP: Creator not on watched list`);
@@ -321,7 +317,7 @@ async function processTokenCreate(event) {
   log("info", "  MATCH: Creator is on watched list — buying");
 
   try {
-    await executeBuy(token, creator, name, symbol, isAgent);
+    await executeBuy(token, creator, name, symbol, false);
   } catch (err) {
     log("error", `Error executing buy: ${err.message}`);
   }
