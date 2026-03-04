@@ -327,7 +327,83 @@ async function processTokenCreate(event) {
   }
 }
 
-// ─── Poll Loop ───────────────────────────────────────────────────────────────
+// ─── WebSocket Event Subscription (near-instant detection) ──────────────────
+let wsProvider = null;
+let wsTm2 = null;
+
+function rpcToWs(rpcUrl) {
+  return rpcUrl.replace(/^https?:\/\//, "wss://");
+}
+
+async function setupEventListener() {
+  const wsUrl = rpcToWs(config.rpcUrl);
+  log("info", `Connecting WebSocket to ${wsUrl.replace(/\/v2\/.*/, "/v2/***")}...`);
+
+  try {
+    wsProvider = new ethers.WebSocketProvider(wsUrl);
+    wsTm2 = new ethers.Contract(TOKEN_MANAGER2, TM2_ABI, wsProvider);
+
+    await wsTm2.on("TokenCreate", async (creator, token, requestId, name, symbol, totalSupply, launchTime, launchFee, event) => {
+      if (!sniperRunning) return;
+      try {
+        const blockNum = event.log.blockNumber;
+        log("info", `TokenCreate detected in block ${blockNum} (LIVE via WSS)`);
+        lastBlock = blockNum;
+        await processTokenCreate({
+          args: [creator, token, requestId, name, symbol, totalSupply, launchTime, launchFee],
+          transactionHash: event.log.transactionHash,
+        });
+        saveState();
+      } catch (err) {
+        log("error", `Error processing token: ${err.message}`);
+      }
+    });
+
+    wsProvider.websocket.on("close", () => {
+      if (!sniperRunning) return;
+      log("error", "BSC WebSocket disconnected — reconnecting in 5s...");
+      teardownEventListener();
+      setTimeout(async () => {
+        if (!sniperRunning) return;
+        const ok = await setupEventListener();
+        if (!ok) {
+          log("error", "WSS reconnect failed — falling back to polling");
+          startPolling();
+        }
+      }, 5000);
+    });
+
+    wsProvider.websocket.on("error", (err) => {
+      log("error", `BSC WebSocket error: ${err.message}`);
+    });
+
+    log("info", "Live event subscription active (near-instant detection)");
+    return true;
+  } catch (err) {
+    log("error", `WebSocket subscription failed: ${err.message}`);
+    log("info", "Falling back to polling mode");
+    return false;
+  }
+}
+
+function teardownEventListener() {
+  if (wsTm2) {
+    wsTm2.removeAllListeners();
+    wsTm2 = null;
+  }
+  if (wsProvider) {
+    wsProvider.destroy();
+    wsProvider = null;
+  }
+}
+
+// ─── Polling Fallback ───────────────────────────────────────────────────────
+function startPolling() {
+  if (pollTimer) return;
+  log("info", `Polling fallback active (every ${config.pollIntervalMs}ms)`);
+  pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
+}
+
 async function pollOnce() {
   if (!sniperRunning) return;
 
@@ -335,7 +411,6 @@ async function pollOnce() {
     const currentBlock = await provider.getBlockNumber();
 
     if (currentBlock > lastBlock) {
-      // Limit range to avoid rate limits (max 50 blocks per query)
       const fromBlock = lastBlock + 1;
       const toBlock = Math.min(currentBlock, fromBlock + 49);
 
@@ -379,7 +454,7 @@ async function startSniper() {
   log("info", "=== Four.Meme Agent Sniper Starting ===");
   log("info", `RPC: ${config.rpcUrl}`);
   log("info", `Buy: ${config.buyAmountBnb} BNB | Slippage: ${config.slippagePct}%`);
-  log("info", `Dry Run: ${config.dryRun} | Poll: ${config.pollIntervalMs}ms`);
+  log("info", `Dry Run: ${config.dryRun}`);
   log("info", `Mode: Notify agent tokens + Buy watched creators only`);
   if (config.watchedCreators.length > 0) {
     log("info", `Watched Creators: ${config.watchedCreators.length}`);
@@ -419,7 +494,12 @@ async function startSniper() {
 
   sniperRunning = true;
   log("info", "Listening for TokenCreate events on TokenManager2...");
-  pollTimer = setTimeout(pollOnce, config.pollIntervalMs);
+
+  // Try WebSocket subscription first, fall back to polling
+  const wsOk = await setupEventListener();
+  if (!wsOk) {
+    startPolling();
+  }
 
   sendDiscord("info", "Four.Meme Sniper Started", `Monitoring BSC for new token launches`, {
     fields: [
@@ -427,6 +507,7 @@ async function startSniper() {
       { name: "Balance", value: `${ethers.formatEther(balance)} BNB` },
       { name: "Agent NFT", value: nftBalance > 0n ? "Verified" : "None" },
       { name: "Mode", value: config.dryRun ? "DRY RUN" : "LIVE" },
+      { name: "Detection", value: wsOk ? "WebSocket (instant)" : "Polling (3s)" },
     ],
     footer: "BNB Chain | Four.Meme",
   });
@@ -434,6 +515,7 @@ async function startSniper() {
 
 function stopSniper() {
   sniperRunning = false;
+  teardownEventListener();
   if (pollTimer) {
     clearTimeout(pollTimer);
     pollTimer = null;
