@@ -188,7 +188,7 @@ function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, creatorNonce
   const breakdown = [];
   if (twitterUrl) { score++; breakdown.push("twitter"); }
   if (webUrl) { score++; breakdown.push("website"); }
-  if (creatorNonce >= 0 && creatorNonce <= 5) { score++; breakdown.push(`fresh-wallet(${creatorNonce}tx)`); }
+  if (creatorNonce >= 0 && creatorNonce < 50) { score++; breakdown.push(`fresh-wallet(${creatorNonce}tx)`); }
   if (holders >= 1) { score++; breakdown.push("has-holders"); }
   if (tradingUsd > 0) { score++; breakdown.push("has-trading"); }
   return { score, good: score >= 3, breakdown };
