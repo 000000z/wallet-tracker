@@ -302,26 +302,28 @@ async function processTokenCreate(event) {
     agentTokensDetected++;
     log("info", `  [AGENT] ${name} (${symbol}) — creator holds 8004 NFT`);
 
-    // Fetch token details (image + socials) from Four.Meme API
+    // Wait for Four.Meme API to index the token, then fetch details
     let imageUrl = null;
     let twitterUrl = null;
     let webUrl = null;
-    try {
-      const detailUrl = `https://four.meme/meme-api/v1/private/token/get?address=${token}`;
-      log("info", `  Fetching socials from ${detailUrl}`);
-      const resp = await fetch(detailUrl);
-      log("info", `  API response: ${resp.status} ${resp.ok}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        log("info", `  API data: twitter=${data?.data?.twitterUrl || 'none'}, web=${data?.data?.webUrl || 'none'}, image=${data?.data?.image ? 'yes' : 'none'}`);
-        if (data?.data) {
-          if (data.data.image) imageUrl = data.data.image;
-          if (data.data.twitterUrl) twitterUrl = data.data.twitterUrl;
-          if (data.data.webUrl) webUrl = data.data.webUrl;
+    const detailUrl = `https://four.meme/meme-api/v1/private/token/get?address=${token}`;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await new Promise(r => setTimeout(r, attempt * 3000)); // 3s, 6s, 9s
+      try {
+        const resp = await fetch(detailUrl);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data?.data) {
+            if (data.data.image) imageUrl = data.data.image;
+            if (data.data.twitterUrl) twitterUrl = data.data.twitterUrl;
+            if (data.data.webUrl) webUrl = data.data.webUrl;
+          }
+          if (imageUrl || twitterUrl || webUrl) {
+            log("info", `  Socials fetched (attempt ${attempt}): twitter=${twitterUrl || 'none'}, web=${webUrl || 'none'}`);
+            break;
+          }
         }
-      }
-    } catch (e) {
-      log("error", `  Socials fetch error: ${e.message}`);
+      } catch {}
     }
 
     const fourMemeLink = `https://four.meme/token/${token}`;
