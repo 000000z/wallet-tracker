@@ -183,8 +183,8 @@ function trackCreatorLaunch(creator) {
 function getRecentLaunches(creator) {
   const key = creator.toLowerCase();
   const timestamps = creatorLaunchTracker.get(key) || [];
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  const recent = timestamps.filter(t => t > oneHourAgo);
+  const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
+  const recent = timestamps.filter(t => t > tenDaysAgo);
   creatorLaunchTracker.set(key, recent); // prune old entries
   return recent.length;
 }
@@ -195,7 +195,7 @@ function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, recentLaunch
   const breakdown = [];
   if (twitterUrl) { score++; breakdown.push("twitter"); }
   if (webUrl) { score++; breakdown.push("website"); }
-  if (recentLaunches < 3) { score++; breakdown.push("not-spammer"); }
+  if (recentLaunches <= 1) { score++; breakdown.push("not-spammer"); }
   if (holders >= 1) { score++; breakdown.push("has-holders"); }
   if (tradingUsd > 0) { score++; breakdown.push("has-trading"); }
   return { score, good: score >= 3, breakdown };
