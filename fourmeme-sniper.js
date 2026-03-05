@@ -307,16 +307,22 @@ async function processTokenCreate(event) {
     let twitterUrl = null;
     let webUrl = null;
     try {
-      const resp = await fetch(`https://four.meme/meme-api/v1/private/token/get?address=${token}`);
+      const detailUrl = `https://four.meme/meme-api/v1/private/token/get?address=${token}`;
+      log("info", `  Fetching socials from ${detailUrl}`);
+      const resp = await fetch(detailUrl);
+      log("info", `  API response: ${resp.status} ${resp.ok}`);
       if (resp.ok) {
         const data = await resp.json();
+        log("info", `  API data: twitter=${data?.data?.twitterUrl || 'none'}, web=${data?.data?.webUrl || 'none'}, image=${data?.data?.image ? 'yes' : 'none'}`);
         if (data?.data) {
           if (data.data.image) imageUrl = data.data.image;
           if (data.data.twitterUrl) twitterUrl = data.data.twitterUrl;
           if (data.data.webUrl) webUrl = data.data.webUrl;
         }
       }
-    } catch {}
+    } catch (e) {
+      log("error", `  Socials fetch error: ${e.message}`);
+    }
 
     const fourMemeLink = `https://four.meme/token/${token}`;
     const bscScanLink = `https://bscscan.com/token/${token}`;
