@@ -55,7 +55,9 @@ async function sendDiscord(type, title, description, opts = {}) {
   if (opts.thumbnail) embed.thumbnail = { url: opts.thumbnail };
 
   try {
-    const payload = JSON.stringify({ embeds: [embed] });
+    const payloadObj = { embeds: [embed] };
+    if (opts.content) payloadObj.content = opts.content;
+    const payload = JSON.stringify(payloadObj);
     console.log(`[4MEME] Discord payload: ${payload.slice(0, 500)}`);
     const resp = await fetch(WEBHOOK_URL, {
       method: "POST",
@@ -95,6 +97,7 @@ let agentTokensDetected = 0;
 let buysExecuted = 0;
 let buyHistory = [];
 const boughtTokens = new Map();
+const creatorLaunchTracker = new Map(); // creatorAddress → [timestamp, ...]
 const logBuffer = [];
 
 let broadcast = () => {};
@@ -168,6 +171,34 @@ async function isAgentWallet(address) {
   } catch {
     return false;
   }
+}
+
+// ─── Creator Launch Tracking ─────────────────────────────────────────────────
+function trackCreatorLaunch(creator) {
+  const key = creator.toLowerCase();
+  if (!creatorLaunchTracker.has(key)) creatorLaunchTracker.set(key, []);
+  creatorLaunchTracker.get(key).push(Date.now());
+}
+
+function getRecentLaunches(creator) {
+  const key = creator.toLowerCase();
+  const timestamps = creatorLaunchTracker.get(key) || [];
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  const recent = timestamps.filter(t => t > oneHourAgo);
+  creatorLaunchTracker.set(key, recent); // prune old entries
+  return recent.length;
+}
+
+// ─── Agent Token Quality Scoring ─────────────────────────────────────────────
+function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, recentLaunches }) {
+  let score = 0;
+  const breakdown = [];
+  if (twitterUrl) { score++; breakdown.push("twitter"); }
+  if (webUrl) { score++; breakdown.push("website"); }
+  if (recentLaunches < 3) { score++; breakdown.push("not-spammer"); }
+  if (holders >= 1) { score++; breakdown.push("has-holders"); }
+  if (tradingUsd > 0) { score++; breakdown.push("has-trading"); }
+  return { score, good: score >= 3, breakdown };
 }
 
 // ─── Execute Buy ─────────────────────────────────────────────────────────────
@@ -290,6 +321,7 @@ async function processTokenCreate(event) {
   const symbol = String(event.args[4]);
 
   tokensDetected++;
+  trackCreatorLaunch(creator);
 
   log("claim", `NEW TOKEN: ${name} (${symbol})`);
   log("info", `  Token: ${token}`);
@@ -306,6 +338,8 @@ async function processTokenCreate(event) {
     let imageUrl = null;
     let twitterUrl = null;
     let webUrl = null;
+    let holders = 0;
+    let tradingUsd = 0;
     const detailUrl = `https://four.meme/meme-api/v1/private/token/get?address=${token}`;
     for (let attempt = 1; attempt <= 3; attempt++) {
       await new Promise(r => setTimeout(r, attempt * 3000)); // 3s, 6s, 9s
@@ -317,9 +351,14 @@ async function processTokenCreate(event) {
             if (data.data.image) imageUrl = data.data.image;
             if (data.data.twitterUrl) twitterUrl = data.data.twitterUrl;
             if (data.data.webUrl) webUrl = data.data.webUrl;
+            // Extract trading data from tokenPrice
+            if (data.data.tokenPrice) {
+              holders = parseInt(data.data.tokenPrice.amount) || 0;
+              tradingUsd = parseFloat(data.data.tokenPrice.trading) || 0;
+            }
           }
           if (imageUrl || twitterUrl || webUrl) {
-            log("info", `  Socials fetched (attempt ${attempt}): twitter=${twitterUrl || 'none'}, web=${webUrl || 'none'}`);
+            log("info", `  Socials fetched (attempt ${attempt}): twitter=${twitterUrl || 'none'}, web=${webUrl || 'none'}, holders=${holders}, trading=$${tradingUsd}`);
             break;
           }
         }
@@ -337,6 +376,12 @@ async function processTokenCreate(event) {
       ? `\uD83C\uDF10 **Socials:** ${socials.join(" | ")}\n`
       : "";
 
+    // Quality scoring for agent tokens
+    const recentLaunches = getRecentLaunches(creator);
+    const { score, good, breakdown } = scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, recentLaunches });
+    log("info", `  [SCORE] ${name} (${symbol}): ${score}/5 ${good ? '— GOOD' : ''} [${breakdown.join(', ')}] (creator launches last hr: ${recentLaunches})`);
+
+    // All agent tokens get the standard orange notification
     sendDiscord("agent",
       `\uD83E\uDD16 Agent Token on Four.Meme`,
       `**${name}** (${symbol}) launched by an AI Agent\n\n` +
@@ -347,9 +392,27 @@ async function processTokenCreate(event) {
       `\uD83D\uDD0D **Links:**\n[Four.Meme](${fourMemeLink}) | [BscScan](${bscScanLink})\n\n` +
       `\uD83D\uDCCB **Quick Copy:**\n\`\`\`${token}\`\`\``, {
       url: fourMemeLink,
-      footer: "\u25CE BNB",
+      footer: `Score: ${score}/5 | \u25CE BNB`,
       thumbnail: imageUrl,
     });
+
+    // Quality tokens also get a green @everyone ping
+    if (good) {
+      sendDiscord("buy",
+        `\uD83D\uDD25 Quality Agent Launch`,
+        `**${name}** (${symbol}) — scored ${score}/5 [${breakdown.join(', ')}]\n\n` +
+        `\uD83E\uDE99 **Token:** ${name} (${symbol})\n` +
+        `\uD83D\uDCCD **Contract:** \`${token}\`\n` +
+        `\uD83D\uDC64 **Creator:** \`${creator}\`\n\n` +
+        socialsLine +
+        `\uD83D\uDD0D **Links:**\n[Four.Meme](${fourMemeLink}) | [BscScan](${bscScanLink})\n\n` +
+        `\uD83D\uDCCB **Quick Copy:**\n\`\`\`${token}\`\`\``, {
+        content: "@everyone",
+        url: fourMemeLink,
+        footer: `Quality Score: ${score}/5 | \u25CE BNB`,
+        thumbnail: imageUrl,
+      });
+    }
   }).catch(() => {});
 
   // ── Buy decision: only if creator is on watched list (instant, no RPC) ──
