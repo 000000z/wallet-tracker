@@ -345,8 +345,8 @@ async function processTokenCreate(event) {
             if (data.data.webUrl) webUrl = data.data.webUrl;
             // Extract trading data from tokenPrice
             if (data.data.tokenPrice) {
-              holders = parseInt(data.data.tokenPrice.amount) || 0;
-              tradingUsd = parseFloat(data.data.tokenPrice.trading) || 0;
+              holders = parseInt(data.data.tokenPrice.holderCount) || 0;
+              tradingUsd = parseFloat(data.data.tokenPrice.tradingUsd) || 0;
             }
           }
           if (imageUrl || twitterUrl || webUrl) {
