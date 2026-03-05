@@ -97,7 +97,6 @@ let agentTokensDetected = 0;
 let buysExecuted = 0;
 let buyHistory = [];
 const boughtTokens = new Map();
-const creatorLaunchTracker = new Map(); // creatorAddress → [timestamp, ...]
 const logBuffer = [];
 
 let broadcast = () => {};
@@ -173,29 +172,23 @@ async function isAgentWallet(address) {
   }
 }
 
-// ─── Creator Launch Tracking ─────────────────────────────────────────────────
-function trackCreatorLaunch(creator) {
-  const key = creator.toLowerCase();
-  if (!creatorLaunchTracker.has(key)) creatorLaunchTracker.set(key, []);
-  creatorLaunchTracker.get(key).push(Date.now());
-}
-
-function getRecentLaunches(creator) {
-  const key = creator.toLowerCase();
-  const timestamps = creatorLaunchTracker.get(key) || [];
-  const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
-  const recent = timestamps.filter(t => t > tenDaysAgo);
-  creatorLaunchTracker.set(key, recent); // prune old entries
-  return recent.length;
+// ─── Creator Nonce Check (spam detection) ────────────────────────────────────
+async function getCreatorNonce(creator) {
+  try {
+    const nonce = await provider.getTransactionCount(creator);
+    return nonce;
+  } catch {
+    return -1; // unknown, don't penalize
+  }
 }
 
 // ─── Agent Token Quality Scoring ─────────────────────────────────────────────
-function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, recentLaunches }) {
+function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, creatorNonce }) {
   let score = 0;
   const breakdown = [];
   if (twitterUrl) { score++; breakdown.push("twitter"); }
   if (webUrl) { score++; breakdown.push("website"); }
-  if (recentLaunches <= 1) { score++; breakdown.push("not-spammer"); }
+  if (creatorNonce >= 0 && creatorNonce <= 5) { score++; breakdown.push(`fresh-wallet(${creatorNonce}tx)`); }
   if (holders >= 1) { score++; breakdown.push("has-holders"); }
   if (tradingUsd > 0) { score++; breakdown.push("has-trading"); }
   return { score, good: score >= 3, breakdown };
@@ -321,7 +314,6 @@ async function processTokenCreate(event) {
   const symbol = String(event.args[4]);
 
   tokensDetected++;
-  trackCreatorLaunch(creator);
 
   log("claim", `NEW TOKEN: ${name} (${symbol})`);
   log("info", `  Token: ${token}`);
@@ -377,9 +369,9 @@ async function processTokenCreate(event) {
       : "";
 
     // Quality scoring for agent tokens
-    const recentLaunches = getRecentLaunches(creator);
-    const { score, good, breakdown } = scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, recentLaunches });
-    log("info", `  [SCORE] ${name} (${symbol}): ${score}/5 ${good ? '— GOOD' : ''} [${breakdown.join(', ')}] (creator launches last hr: ${recentLaunches})`);
+    const creatorNonce = await getCreatorNonce(creator);
+    const { score, good, breakdown } = scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, creatorNonce });
+    log("info", `  [SCORE] ${name} (${symbol}): ${score}/5 ${good ? '— GOOD' : ''} [${breakdown.join(', ')}] (creator nonce: ${creatorNonce})`);
 
     // All agent tokens get the standard orange notification
     sendDiscord("agent",
