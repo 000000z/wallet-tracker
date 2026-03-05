@@ -191,7 +191,7 @@ function scoreAgentToken({ twitterUrl, webUrl, holders, tradingUsd, creatorNonce
   if (creatorNonce >= 0 && creatorNonce < 50) { score++; breakdown.push(`fresh-wallet(${creatorNonce}tx)`); }
   if (holders >= 7) { score++; breakdown.push(`holders(${holders})`); }
   if (tradingUsd >= 5000) { score++; breakdown.push(`vol($${tradingUsd})`); }
-  return { score, good: score >= 3, breakdown };
+  return { score, good: score >= 4, breakdown };
 }
 
 // ─── Execute Buy ─────────────────────────────────────────────────────────────
