@@ -205,14 +205,13 @@ async function executeBuy(tokenAddress, creatorAddress, tokenName, tokenSymbol, 
       amountBnb: buyAmount, txHash: "", dryRun: true, isAgent, time: Date.now(),
     });
     saveState();
-    sendDiscord("buy", `\u{1f9ea} DRY RUN: ${tokenName} (${tokenSymbol})`, `Would buy **${tokenName}** (${tokenSymbol}) with ${buyAmount} BNB`, {
-      fields: [
-        { name: "\u{1fa99} Token", value: `**${tokenName}** (${tokenSymbol})`, inline: false },
-        { name: "\u{1f4cd} Contract", value: `\`${tokenAddress}\``, inline: false },
-        { name: "\u{1f4b0} Amount", value: `${buyAmount} BNB` },
-        { name: "\u{1f50d} Links", value: `[Four.Meme](https://four.meme/token/${tokenAddress}) \u2022 [BscScan](https://bscscan.com/token/${tokenAddress})`, inline: false },
-        { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${tokenAddress}\`\`\``, inline: false },
-      ],
+    sendDiscord("buy", `\u{1f9ea} DRY RUN: ${tokenName} (${tokenSymbol})`,
+      `Would buy **${tokenName}** (${tokenSymbol}) with ${buyAmount} BNB\n\n` +
+      `\u{1fa99} **Token:** ${tokenName} (${tokenSymbol})\n` +
+      `\u{1f4cd} **Contract:** \`${tokenAddress}\`\n` +
+      `\u{1f4b0} **Amount:** ${buyAmount} BNB\n\n` +
+      `\u{1f50d} **Links:**\n[Four.Meme](https://four.meme/token/${tokenAddress}) | [BscScan](https://bscscan.com/token/${tokenAddress})\n\n` +
+      `\u{1f4cb} **Quick Copy:**\n\`\`\`${tokenAddress}\`\`\``, {
       url: `https://four.meme/token/${tokenAddress}`,
       footer: "\u25ce BNB",
     });
@@ -264,15 +263,14 @@ async function executeBuy(tokenAddress, creatorAddress, tokenName, tokenSymbol, 
     });
     saveState();
 
-    sendDiscord("buy", `\u2705 Sniped: ${tokenName} (${tokenSymbol})`, `Bought **${tokenName}** (${tokenSymbol}) for ${buyAmount} BNB`, {
-      fields: [
-        { name: "\u{1fa99} Token", value: `**${tokenName}** (${tokenSymbol})`, inline: false },
-        { name: "\u{1f4cd} Contract", value: `\`${tokenAddress}\``, inline: false },
-        { name: "\u{1f4b0} Amount", value: `${buyAmount} BNB` },
-        { name: "\u{1f4ca} Tokens", value: `~${ethers.formatEther(estimatedAmount)}` },
-        { name: "\u{1f50d} Links", value: `[Four.Meme](https://four.meme/token/${tokenAddress}) \u2022 [BscScan](https://bscscan.com/tx/${tx.hash})`, inline: false },
-        { name: "\u{1f4cb} Quick Copy", value: `\`\`\`${tokenAddress}\`\`\``, inline: false },
-      ],
+    sendDiscord("buy", `\u2705 Sniped: ${tokenName} (${tokenSymbol})`,
+      `Bought **${tokenName}** (${tokenSymbol}) for ${buyAmount} BNB\n\n` +
+      `\u{1fa99} **Token:** ${tokenName} (${tokenSymbol})\n` +
+      `\u{1f4cd} **Contract:** \`${tokenAddress}\`\n` +
+      `\u{1f4b0} **Amount:** ${buyAmount} BNB\n` +
+      `\u{1f4ca} **Tokens:** ~${ethers.formatEther(estimatedAmount)}\n\n` +
+      `\u{1f50d} **Links:**\n[Four.Meme](https://four.meme/token/${tokenAddress}) | [BscScan](https://bscscan.com/tx/${tx.hash})\n\n` +
+      `\u{1f4cb} **Quick Copy:**\n\`\`\`${tokenAddress}\`\`\``, {
       url: `https://four.meme/token/${tokenAddress}`,
       footer: "\u25ce BNB",
     });
@@ -314,17 +312,17 @@ async function processTokenCreate(event) {
       }
     } catch {}
 
+    const fourMemeLink = `https://four.meme/token/${token}`;
+    const bscScanLink = `https://bscscan.com/token/${token}`;
     sendDiscord("agent",
       `\uD83E\uDD16 Agent Token on Four.Meme`,
-      `**${name}** (${symbol}) launched by an AI Agent`, {
-      fields: [
-        { name: "\uD83E\uDE99 Token", value: `**${name}** (${symbol})`, inline: false },
-        { name: "\uD83D\uDCCD Contract", value: `\`${token}\``, inline: false },
-        { name: "\uD83D\uDC64 Creator", value: `\`${creator}\``, inline: false },
-        { name: "\uD83D\uDD0D Links", value: `[Four.Meme](https://four.meme/token/${token}) \u2022 [BscScan](https://bscscan.com/token/${token})`, inline: false },
-        { name: "\uD83D\uDCCB Quick Copy", value: `\`\`\`${token}\`\`\``, inline: false },
-      ],
-      url: `https://four.meme/token/${token}`,
+      `**${name}** (${symbol}) launched by an AI Agent\n\n` +
+      `\uD83E\uDE99 **Token:** ${name} (${symbol})\n` +
+      `\uD83D\uDCCD **Contract:** \`${token}\`\n` +
+      `\uD83D\uDC64 **Creator:** \`${creator}\`\n\n` +
+      `\uD83D\uDD0D **Links:**\n[Four.Meme](${fourMemeLink}) | [BscScan](${bscScanLink})\n\n` +
+      `\uD83D\uDCCB **Quick Copy:**\n\`\`\`${token}\`\`\``, {
+      url: fourMemeLink,
       footer: "\u25CE BNB",
       thumbnail: imageUrl,
     });
