@@ -302,24 +302,40 @@ async function processTokenCreate(event) {
     agentTokensDetected++;
     log("info", `  [AGENT] ${name} (${symbol}) — creator holds 8004 NFT`);
 
-    // Fetch token image from Four.Meme API
+    // Fetch token details (image + socials) from Four.Meme API
     let imageUrl = null;
+    let twitterUrl = null;
+    let webUrl = null;
     try {
-      const resp = await fetch(`https://four.meme/meme-api/v1/public/token/info?address=${token}`);
+      const resp = await fetch(`https://four.meme/meme-api/v1/private/token/get?address=${token}`);
       if (resp.ok) {
         const data = await resp.json();
-        if (data?.data?.image) imageUrl = data.data.image;
+        if (data?.data) {
+          if (data.data.image) imageUrl = data.data.image;
+          if (data.data.twitterUrl) twitterUrl = data.data.twitterUrl;
+          if (data.data.webUrl) webUrl = data.data.webUrl;
+        }
       }
     } catch {}
 
     const fourMemeLink = `https://four.meme/token/${token}`;
     const bscScanLink = `https://bscscan.com/token/${token}`;
+
+    // Build socials line
+    const socials = [];
+    if (twitterUrl) socials.push(`[Twitter](${twitterUrl})`);
+    if (webUrl) socials.push(`[Website](${webUrl})`);
+    const socialsLine = socials.length > 0
+      ? `\uD83C\uDF10 **Socials:** ${socials.join(" | ")}\n`
+      : "";
+
     sendDiscord("agent",
       `\uD83E\uDD16 Agent Token on Four.Meme`,
       `**${name}** (${symbol}) launched by an AI Agent\n\n` +
       `\uD83E\uDE99 **Token:** ${name} (${symbol})\n` +
       `\uD83D\uDCCD **Contract:** \`${token}\`\n` +
       `\uD83D\uDC64 **Creator:** \`${creator}\`\n\n` +
+      socialsLine +
       `\uD83D\uDD0D **Links:**\n[Four.Meme](${fourMemeLink}) | [BscScan](${bscScanLink})\n\n` +
       `\uD83D\uDCCB **Quick Copy:**\n\`\`\`${token}\`\`\``, {
       url: fourMemeLink,
