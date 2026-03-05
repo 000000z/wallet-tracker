@@ -55,15 +55,22 @@ async function sendDiscord(type, title, description, opts = {}) {
   if (opts.thumbnail) embed.thumbnail = { url: opts.thumbnail };
 
   try {
+    const payload = JSON.stringify({ embeds: [embed] });
+    console.log(`[4MEME] Discord payload: ${payload.slice(0, 500)}`);
     const resp = await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ embeds: [embed] }),
+      body: payload,
     });
+    console.log(`[4MEME] Discord response: ${resp.status}`);
+    if (!resp.ok && resp.status !== 429) {
+      const errText = await resp.text().catch(() => "");
+      console.error(`[4MEME] Discord error response: ${errText}`);
+    }
     if (resp.status === 429) {
       const data = await resp.json().catch(() => ({}));
       await new Promise(r => setTimeout(r, (data.retry_after || 1) * 1000));
-      await fetch(WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ embeds: [embed] }) });
+      await fetch(WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
     }
   } catch (err) {
     console.error(`[4MEME] Discord error: ${err.message}`);
@@ -279,10 +286,10 @@ async function executeBuy(tokenAddress, creatorAddress, tokenName, tokenSymbol, 
 
 // ─── Process TokenCreate Event ───────────────────────────────────────────────
 async function processTokenCreate(event) {
-  const creator = event.args[0];
-  const token = event.args[1];
-  const name = event.args[3];
-  const symbol = event.args[4];
+  const creator = String(event.args[0]);
+  const token = String(event.args[1]);
+  const name = String(event.args[3]);
+  const symbol = String(event.args[4]);
 
   tokensDetected++;
 
