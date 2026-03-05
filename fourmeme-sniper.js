@@ -407,7 +407,7 @@ async function processTokenCreate(event) {
         socialsLine +
         `\uD83D\uDD0D **Links:**\n[Four.Meme](${fourMemeLink}) | [BscScan](${bscScanLink})\n\n` +
         `\uD83D\uDCCB **Quick Copy:**\n\`\`\`${token}\`\`\``, {
-        content: "@everyone",
+        content: "<@&1478943212138790932>",
         url: fourMemeLink,
         footer: `Quality Score: ${score}/5 | \u25CE BNB`,
         thumbnail: imageUrl,
