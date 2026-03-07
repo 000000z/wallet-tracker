@@ -1,0 +1,12 @@
+node_modules
+.claude
+memory
+.git
+pumpswap-sniper
+claim-sniper
+worker
+*.ps1
+*.json
+!package.json
+!package-lock.json
+!tracked_wallets.json
