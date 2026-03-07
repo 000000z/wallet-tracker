@@ -847,6 +847,48 @@ app.get("/api/fourmeme/history", (req, res) => {
   res.json(fourmemeSniper.getHistory());
 });
 
+// ─── Twitter Follow Tracker ─────────────────────────────────────────────────
+let twitterTracker = null;
+try {
+  twitterTracker = require("./site/twitter-follow-tracker");
+  twitterTracker.init((entry) => { /* Discord-only, no WS needed */ });
+  console.log("[TWITTER] Follow tracker module loaded");
+} catch (err) {
+  console.error("[TWITTER] Failed to load:", err.message);
+}
+
+app.post("/api/twitter/start", async (req, res) => {
+  if (!twitterTracker) return res.status(500).json({ ok: false, error: "Twitter tracker module not loaded" });
+  try {
+    await twitterTracker.startTracker();
+    res.json({ ok: true, status: "running" });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/twitter/stop", (req, res) => {
+  if (!twitterTracker) return res.status(500).json({ ok: false, error: "Twitter tracker module not loaded" });
+  twitterTracker.stopTracker();
+  res.json({ ok: true, status: "stopped" });
+});
+
+app.get("/api/twitter/status", (req, res) => {
+  if (!twitterTracker) return res.json({ running: false, targets: 0, followsDetected: 0 });
+  res.json(twitterTracker.getStatus());
+});
+
+app.get("/api/twitter/config", (req, res) => {
+  if (!twitterTracker) return res.json({});
+  res.json(twitterTracker.getConfig());
+});
+
+app.post("/api/twitter/config", (req, res) => {
+  if (!twitterTracker) return res.status(500).json({ ok: false, error: "Twitter tracker module not loaded" });
+  twitterTracker.updateConfig(req.body);
+  res.json({ ok: true });
+});
+
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────
 function shutdown() {
   console.log("\nShutting down...");
@@ -859,6 +901,9 @@ function shutdown() {
   }
   if (fourmemeSniper) {
     try { fourmemeSniper.stopSniper(); } catch {}
+  }
+  if (twitterTracker) {
+    try { twitterTracker.stopTracker(); } catch {}
   }
   server.close();
   process.exit(0);
